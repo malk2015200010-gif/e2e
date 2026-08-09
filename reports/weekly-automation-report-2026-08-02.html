@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mentora — Weekly Automation Report (2 Aug 2026)</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.55;
+      font-size: 10.5pt;
+      margin: 0;
+      padding: 0;
+    }
+    code, .mono { font-family: "SF Mono", Menlo, monospace; font-size: 9pt; }
+    header {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+    }
+    h1 { font-size: 20pt; margin: 0 0 6px; color: #0f172a; }
+    h2 {
+      font-size: 13pt;
+      margin: 20px 0 8px;
+      color: #1e40af;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
+      page-break-after: avoid;
+    }
+    h3 { font-size: 11pt; margin: 12px 0 6px; color: #334155; }
+    .subtitle { color: #64748b; font-size: 9.5pt; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .kpi {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+    .kpi .label { font-size: 8.5pt; color: #64748b; }
+    .kpi .value { font-size: 16pt; font-weight: 700; color: #0f172a; }
+    .callout {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 10px 14px;
+      margin: 12px 0;
+      border-radius: 4px;
+      font-size: 9.5pt;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 14px;
+      font-size: 9pt;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f1f5f9; font-weight: 600; color: #334155; }
+    tr.new td { background: #f0fdf4; }
+    tr.fix td { background: #eff6ff; }
+    ul { margin: 6px 0; padding-left: 18px; }
+    li { margin-bottom: 3px; }
+    footer {
+      margin-top: 20px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8pt;
+      color: #94a3b8;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 600;
+    }
+    .badge-new { background: #dcfce7; color: #166534; }
+    .badge-fix { background: #dbeafe; color: #1e40af; }
+    .badge-upd { background: #fef3c7; color: #92400e; }
+    .badge-p1 { background: #fee2e2; color: #991b1b; }
+    .badge-p2 { background: #dbeafe; color: #1e40af; }
+    .badge-p3 { background: #f1f5f9; color: #475569; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .box {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      page-break-inside: avoid;
+    }
+    .box h3 { margin-top: 0; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h2 { page-break-after: avoid; }
+      table, .box, .callout { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Mentora Automation — Weekly Report</h1>
+  <div class="subtitle">Cypress E2E · Period: <strong>28 Jul – 2 Aug 2026</strong></div>
+  <div class="subtitle">Environment: <span class="mono">https://dev.mentoraeg.com</span> · Prepared: <strong>2 Aug 2026</strong></div>
+</header>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Shared Actions cases</div>
+    <div class="value">20</div>
+  </div>
+  <div class="kpi">
+    <div class="label">WhatsApp float cases</div>
+    <div class="value">15</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Major suites touched</div>
+    <div class="value">5+</div>
+  </div>
+  <div class="kpi">
+    <div class="label">CI workflow</div>
+    <div class="value">1</div>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>Executive summary.</strong>
+  This week the automation repo gained <strong>GitHub Actions CI</strong>, a new
+  <strong>Shared Actions web regression</strong> suite for the auth / enrollment / lecture / live refactor,
+  <strong>WhatsApp float</strong> coverage, and stability rework across
+  <strong>Hybrid delivery</strong>, <strong>Payment / XPay</strong>, and <strong>checkout edge cases</strong>
+  — all against the live remote environment (no local app server).
+</div>
+
+<h2>1. Suites delivered / updated</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Area</th>
+      <th>Folder</th>
+      <th>Cases</th>
+      <th>Status</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="new">
+      <td>Shared Actions web regression</td>
+      <td class="mono">shared_actions_web/</td>
+      <td>20 (SAW-001…020)</td>
+      <td><span class="badge badge-new">New</span></td>
+      <td>Register, login, enrolled courses, lecture, live-class, schedule</td>
+    </tr>
+    <tr class="new">
+      <td>WhatsApp float widget</td>
+      <td class="mono">whatsapp_float/</td>
+      <td>15 (MEN-2396…2410)</td>
+      <td><span class="badge badge-new">New</span></td>
+      <td>Visibility, wa.me, dismiss, AR, admin hidden</td>
+    </tr>
+    <tr class="fix">
+      <td>Remove Hybrid delivery</td>
+      <td class="mono">remove_hybrid_delivery/</td>
+      <td>15 (MEN-2290…2304)</td>
+      <td><span class="badge badge-fix">Stabilized</span></td>
+      <td>Fixed hang on last case; Debugbar-safe Hybrid checks</td>
+    </tr>
+    <tr>
+      <td>Payment / XPay checkout</td>
+      <td class="mono">payment/</td>
+      <td>~14</td>
+      <td><span class="badge badge-upd">Reworked</span></td>
+      <td>API add-to-cart; full card E2E gated by env flag</td>
+    </tr>
+    <tr>
+      <td>Checkout edge cases</td>
+      <td class="mono">new-tests/</td>
+      <td>10 (TC-NEW-*)</td>
+      <td><span class="badge badge-upd">Reworked</span></td>
+      <td>Double pay, price tamper, pending, voucher, admin gate</td>
+    </tr>
+    <tr>
+      <td>Course access rights</td>
+      <td class="mono">course_access_rights/</td>
+      <td>CAR suite</td>
+      <td><span class="badge badge-upd">Updated</span></td>
+      <td>Enrolled / instructor / admin / pending paths</td>
+    </tr>
+    <tr>
+      <td>Parent phone</td>
+      <td class="mono">parent_phone/</td>
+      <td>Existing + fixes</td>
+      <td><span class="badge badge-upd">Updated</span></td>
+      <td>Registration + social-complete aligned to live UI</td>
+    </tr>
+    <tr class="new">
+      <td>CI pipeline</td>
+      <td class="mono">.github/workflows/</td>
+      <td>cypress.yml</td>
+      <td><span class="badge badge-new">New</span></td>
+      <td>Push/PR → npm ci → cypress run → artifacts on failure</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2. Key highlights</h2>
+<table>
+  <thead>
+    <tr><th>Item</th><th>Detail</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Shared Actions story coverage</strong></td>
+      <td>Web regression for RegisterUser, AuthenticateUser, ListEnrolledCourses, lecture &amp; live-class join after Action refactor</td>
+    </tr>
+    <tr>
+      <td><strong>GitHub Actions Cypress workflow</strong></td>
+      <td>Remote env only. Screenshots/videos uploaded as artifacts when the run fails (7-day retention)</td>
+    </tr>
+    <tr>
+      <td><strong>Hybrid suite unblocked</strong></td>
+      <td>MEN-2304 no longer stalls the suite; <span class="mono">pageUiText()</span> strips Debugbar false positives for “hybrid”</td>
+    </tr>
+    <tr>
+      <td><strong>Payment reliability</strong></td>
+      <td>Replaced flaky UI cart clicks with <span class="mono">POST /add-to-cart</span>; Mentora-side asserts always run</td>
+    </tr>
+    <tr>
+      <td><strong>Soft-pass mode</strong></td>
+      <td>Global fail handlers can soft-pass — green runs may mask incomplete chains; review CI carefully</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>3. Shared Actions suite map (SAW)</h2>
+<table>
+  <thead>
+    <tr><th>IDs</th><th>Area</th><th>Coverage</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>SAW-001…004</td><td>Register</td><td>Student/instructor signup, weak password, parent = student phone</td></tr>
+    <tr><td>SAW-005…008</td><td>Login</td><td>Valid/invalid, remember me; inactive skipped (no fixture)</td></tr>
+    <tr><td>SAW-009</td><td>Social</td><td>Google entry + profile fields smoke</td></tr>
+    <tr><td>SAW-010…012</td><td>Enrolled courses</td><td>List, dedupe, CTAs / empty state</td></tr>
+    <tr><td>SAW-013…016</td><td>Lecture</td><td>Guest / enrolled / lock / admin</td></tr>
+    <tr><td>SAW-017…019</td><td>Live class</td><td>Enrolled join, blocked non-enrolled, instructor path</td></tr>
+    <tr><td>SAW-020</td><td>Schedule</td><td><span class="mono">/dashboard/my-schedule</span> + course schedule smoke</td></tr>
+  </tbody>
+</table>
+
+<div class="two-col">
+  <div class="box">
+    <h3>CI &amp; reporting</h3>
+    <ul>
+      <li>Workflow: <span class="mono">.github/workflows/cypress.yml</span></li>
+      <li>Triggers: <span class="mono">push</span> + <span class="mono">pull_request</span></li>
+      <li>Steps: Node 20 → <span class="mono">npm ci</span> → Cypress install → <span class="mono">cypress run</span></li>
+      <li>Artifacts on failure: screenshots + videos</li>
+      <li>View: GitHub → Actions → <strong>Cypress E2E</strong> → latest run</li>
+    </ul>
+  </div>
+  <div class="box">
+    <h3>Out of scope / gaps</h3>
+    <ul>
+      <li>FCM push send — not implemented in product</li>
+      <li>Mobile <span class="mono">/api/v1/devices</span> — not automated this week</li>
+      <li>SAW-008 inactive account — skipped (no fixture)</li>
+      <li>Full XPay card E2E — opt-in via <span class="mono">CYPRESS_XPAY_FULL_E2E</span></li>
+      <li>Node 20 Actions deprecation warning — upgrade pending</li>
+    </ul>
+  </div>
+</div>
+
+<h2>4. Next week recommendations</h2>
+<table>
+  <thead>
+    <tr><th>Priority</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-p1">P1</span></td>
+      <td>Upgrade <span class="mono">actions/checkout</span> + <span class="mono">actions/setup-node</span> for Node 24 runners</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-p1">P1</span></td>
+      <td>Confirm CI green run and document artifact download for the QA team</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-p2">P2</span></td>
+      <td>Add HTML / Mochawesome report artifact on every run (pass or fail)</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-p2">P2</span></td>
+      <td>Optional Cypress Cloud recording (<span class="mono">projectId: rjb1ns</span>)</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-p3">P3</span></td>
+      <td>Mobile devices API smoke (FCM register/unregister) — send still out of scope</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-p3">P3</span></td>
+      <td>Add inactive-account fixture for SAW-008</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>5. Commits this window</h2>
+<table>
+  <thead>
+    <tr><th>Commit</th><th>Date</th><th>Summary</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="mono">309aff2</td><td>28 Jul</td><td>Checkpoint before main work</td></tr>
+    <tr><td class="mono">21f09ca</td><td>1 Aug</td><td>Suite edits — payment, new-tests, hybrid, whatsapp, support</td></tr>
+    <tr><td class="mono">88c8ac2</td><td>2 Aug</td><td>GitHub Actions Cypress workflow</td></tr>
+    <tr><td class="mono">63562e7</td><td>2 Aug</td><td>Shared Actions web suite</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  Mentora Cypress Automation · Weekly Report · 2 Aug 2026 · Generated from repo activity on <span class="mono">dev.mentora</span>
+</footer>
+
+</body>
+</html>

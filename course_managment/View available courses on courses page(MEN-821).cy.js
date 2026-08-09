@@ -32,8 +32,13 @@ it('View available courses', () => {
       .should('have.attr', 'src')
       .and('not.be.empty')
 
-    // Price
-    cy.contains('EGP').should('exist')
+    // Price — course can be either paid ("EGP123.00") or "Free"; scope to the
+    // real price element so we never accidentally match hidden analytics
+    // script / debugbar content elsewhere on the page.
+    cy.get('.price-html-wrap')
+      .should('exist')
+      .invoke('text')
+      .should('match', /EGP|Free|\$/i)
 
   })
 

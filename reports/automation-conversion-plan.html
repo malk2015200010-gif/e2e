@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mentora — Automation Conversion Plan</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.55;
+      font-size: 11pt;
+      margin: 0;
+      padding: 0;
+    }
+    code, .mono { font-family: "SF Mono", Menlo, monospace; font-size: 9.5pt; }
+    header {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 14px;
+      margin-bottom: 22px;
+    }
+    h1 { font-size: 22pt; margin: 0 0 6px; color: #0f172a; }
+    h2 { font-size: 14pt; margin: 22px 0 10px; color: #1e40af; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+    h3 { font-size: 12pt; margin: 14px 0 8px; color: #334155; }
+    .subtitle { color: #64748b; font-size: 10pt; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .kpi {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+    .kpi .label { font-size: 9pt; color: #64748b; }
+    .kpi .value { font-size: 18pt; font-weight: 700; color: #0f172a; }
+    .kpi .detail { font-size: 8.5pt; color: #64748b; }
+    .callout {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 10px 14px;
+      margin: 14px 0;
+      border-radius: 4px;
+      font-size: 10pt;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px;
+      font-size: 9.5pt;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 7px 9px;
+      text-align: left;
+    }
+    th { background: #f1f5f9; font-weight: 600; color: #334155; }
+    .phase {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+    }
+    .phase-title { font-weight: 700; color: #1e40af; font-size: 11pt; }
+    .phase-meta { color: #64748b; font-size: 9pt; margin-bottom: 8px; }
+    ul { margin: 6px 0; padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    .checklist li { list-style: none; }
+    .checklist li::before { content: "☐ "; color: #2563eb; }
+    footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8.5pt;
+      color: #94a3b8;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 600;
+    }
+    .badge-high { background: #dcfce7; color: #166534; }
+    .badge-med { background: #dbeafe; color: #1e40af; }
+    .badge-low { background: #fef3c7; color: #92400e; }
+  .badge-done { background: #dcfce7; color: #166534; }
+  .badge-new { background: #dbeafe; color: #1e40af; }
+  .badge-partial { background: #fef3c7; color: #92400e; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .update-box {
+    border: 1px solid #bbf7d0;
+    background: #f0fdf4;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0 20px;
+    page-break-inside: avoid;
+  }
+  .update-box h2 { margin-top: 0; color: #166534; border-bottom: 1px solid #bbf7d0; }
+  .update-box.latest {
+    border-color: #93c5fd;
+    background: #eff6ff;
+  }
+  .update-box.latest h2 { color: #1e40af; border-bottom-color: #bfdbfe; }
+  .update-box.older { opacity: 0.95; }
+  tr.done td { background: #f0fdf4; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Manual → Automation Conversion Plan</h1>
+  <div class="subtitle">Mentora E2E · Jira → Cypress · 16-week roadmap</div>
+  <div class="subtitle">dev.mentoraeg.com · 12 Jul 2026 · <strong>Updated 2 Aug 2026</strong></div>
+</header>
+
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="label">Story Automation (now)</div>
+    <div class="value">~23%</div>
+    <div class="detail">~24 / 105 stories (est.)</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Literal MEN keys in code</div>
+    <div class="value">235</div>
+    <div class="detail">Unique MEN-* refs in *.cy.js</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Target (4 months)</div>
+    <div class="value">50%</div>
+    <div class="detail">~490 TC keys automated</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Cypress Tests (now)</div>
+    <div class="value">691</div>
+    <div class="detail">47 spec files · was 625 on 20 Jul</div>
+  </div>
+</div>
+
+<div class="callout">
+  <strong>Strategy:</strong> Automate by Story priority, not raw TC count.
+  Every <code>it()</code> block must include the Jira key <code>MEN-XXXX</code>.
+  Exclude mobile-native and infrastructure stories from the 50% target.
+</div>
+
+<div class="update-box latest">
+  <h2>Progress Update — 2 Aug 2026 (since 20 Jul)</h2>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="label">Cypress Tests</div>
+      <div class="value">625 → 691</div>
+      <div class="detail">+66 tests · 43 → 47 spec files</div>
+    </div>
+    <div class="kpi">
+      <div class="label">CI Pipeline</div>
+      <div class="value">Live</div>
+      <div class="detail">GitHub Actions · cypress.yml</div>
+    </div>
+    <div class="kpi">
+      <div class="label">New suites this window</div>
+      <div class="value">4</div>
+      <div class="detail">Shared Actions · WhatsApp float · Hybrid · CI</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Stabilized / reworked</div>
+      <div class="value">3</div>
+      <div class="detail">Payment · new-tests · Hybrid hang fix</div>
+    </div>
+  </div>
+
+  <h3>Newly automated / shipped since 20 Jul</h3>
+  <table>
+    <tr><th>Area</th><th>What was added</th><th>Files</th></tr>
+    <tr class="done"><td><span class="badge badge-new">NEW</span> Shared Actions web regression</td>
+      <td>Web Blade regression after product moved auth + enrolled courses + lecture/live join to shared Actions
+        (same rules as mobile <code>/api/v1</code>). 20 cases: register, login, social smoke, enrolled list/dedupe,
+        lecture player, live-class join/block/host, schedule smoke. FCM send &amp; mobile devices API out of scope.</td>
+      <td class="mono">shared_actions_web/shared_actions_web.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-new">NEW</span> MEN-2380 / MEN-2396–2410 — WhatsApp float</td>
+      <td>Floating WhatsApp widget: guest + auth visibility, fixed position, wa.me + prefilled message,
+        dismiss persistence across pages, Arabic labels, hidden in admin panel. 15 test cases.</td>
+      <td class="mono">whatsapp_float/whatsapp_float.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-done">DONE</span> MEN-2126 — Remove Hybrid delivery</td>
+      <td>15 cases (MEN-2290…2304): create Recorded/Live only, catalog filters, migration of former Hybrid → Live,
+        EN/AR copy, API rejects hybrid. <strong>Stabilized 1 Aug:</strong> MEN-2304 no longer hangs the suite
+        (Debugbar “hybrid” false positives → <code>pageUiText()</code> + request-only checks).</td>
+      <td class="mono">remove_hybrid_delivery/remove_hybrid_delivery.MEN-2126.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-done">REWORKED</span> Payment / XPay + checkout edges</td>
+      <td>Cart/checkout stabilized via API <code>POST /add-to-cart</code> (detached-DOM clicks fixed). Mentora-side
+        XPay redirect always runs; full card E2E gated by <code>CYPRESS_XPAY_FULL_E2E=1</code>.
+        <code>new-tests</code>: double pay, price tamper, duplicate purchase, pending, expired voucher, admin URL gate.</td>
+      <td class="mono">payment/* · new-tests/TC-NEW-*</td></tr>
+    <tr class="done"><td><span class="badge badge-new">NEW</span> GitHub Actions CI</td>
+      <td>Workflow on push/PR: Node 20 → <code>npm ci</code> → <code>cypress install</code> → <code>cypress run</code>
+        against remote <code>dev.mentoraeg.com</code> (no local server). Uploads screenshots/videos artifacts on failure.
+        Note: runner warns Node 20 deprecated for action runtimes — upgrade checkout/setup-node next.</td>
+      <td class="mono">.github/workflows/cypress.yml</td></tr>
+    <tr class="done"><td><span class="badge badge-partial">UPDATED</span> Course access + parent phone</td>
+      <td>Access-rights helpers aligned to live enrolled-courses UX; parent-phone registration/social flows
+        adjusted for live form + country phone validation.</td>
+      <td class="mono">course_access_rights/* · parent_phone/*</td></tr>
+  </table>
+
+  <h3>Still open — carried forward</h3>
+  <ul>
+    <li>MEN-2005 Instructor Finance — <strong>still #1 zero-coverage priority</strong></li>
+    <li>MEN-1956 Buy running sessions / MEN-1724 Attendance — still 0%</li>
+    <li>Mobile <code>POST/DELETE /api/v1/devices</code> (FCM register) — not in web suite yet; FCM <em>send</em> out of product scope</li>
+    <li>Many older <code>it()</code> blocks still lack <code>MEN-XXXX</code> prefixes (grep coverage incomplete)</li>
+    <li>CI reports today = Actions logs + failure artifacts only (no HTML/Mochawesome yet)</li>
+  </ul>
+</div>
+
+<div class="update-box older">
+  <h2>Progress Update — 20 Jul 2026 (8 days in) — archived</h2>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="label">Cypress Tests</div>
+      <div class="value">570 → 625</div>
+      <div class="detail">+55 tests · 40 → 43 spec files</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Story Coverage</div>
+      <div class="value">18% → 20%</div>
+      <div class="detail">19/104 → 21/105 (9 tagged + 12 verified untagged)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Done‑TC Coverage</div>
+      <div class="value">13.3%</div>
+      <div class="detail">45 / 339 "Done" test cases (new metric — stricter than raw TC %)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Open Gap</div>
+      <div class="value">48</div>
+      <div class="detail">Done stories still with zero Cypress evidence</div>
+    </div>
+  </div>
+
+  <h3>Newly automated since the 12 Jul plan</h3>
+  <table>
+    <tr><th>Area</th><th>What was added</th><th>Files</th></tr>
+    <tr class="done"><td><span class="badge badge-done">DONE</span> Password Policy — live checklist popover</td>
+      <td>Reverse‑engineered the <code>#password-checklist-password</code> popover (opens on focus, live‑updates
+        per keystroke); discovered the register form's <code>submit</code> handler calls
+        <code>preventDefault()</code> client‑side, so no <code>/register</code> request is ever sent for a
+        non‑compliant password. Rewrote weak‑password negative tests around that fact + added 3 popover tests.</td>
+      <td class="mono">regestration/password_policy_*.js, .csv</td></tr>
+    <tr class="done"><td><span class="badge badge-done">DONE</span> MEN-1726 / MEN-2135–2167 — Instructor Assistants</td>
+      <td>Full permission‑matrix suite: create/login/deactivate assistant, per‑permission access checks
+        (courses, curriculum, pricing, live sessions, roster, grading, earnings, withdrawals), menu visibility
+        by role. 33 test cases.</td>
+      <td class="mono">instructor_assistants/instructor_assistants.MEN-1726.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-done">DONE</span> MEN-231 — Instructor ID Verification</td>
+      <td>End‑to‑end: register → verify email → upload ID → admin approves in <code>/admin/verifications</code>
+        → publish gate lifts. Plus 4 negative/access‑control cases. 11 test cases.</td>
+      <td class="mono">instructor_verification/instructor_verification.MEN-231.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-new">NEW FEATURE</span> Multi‑field course search (no Jira key yet)</td>
+      <td><code>HomeController</code> now splits the search query into words and matches each against title,
+        category chain, and instructor names (AND across words, OR across fields). Logic verified against the
+        live dev API before writing 16 test cases.</td>
+      <td class="mono">course_managment/course_search_multiword.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-done">DONE</span> MEN-1457 / MEN-2197 — XPay migration</td>
+      <td>Checkout against the new XPay API + webhook signature validation — closes the "Partial" status this
+        item had in the Priority Queue below.</td>
+      <td class="mono">payment/xpay_checkout.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-done">DONE</span> MEN-1718 — Parent phone number</td>
+      <td>Diagnostics + audit pass on the register/settings parent‑phone field validation.</td>
+      <td class="mono">parent_phone/parent_phone.cy.js</td></tr>
+    <tr class="done"><td><span class="badge badge-done">STABILIZED</span> MEN-1637–1677 — Curriculum Builder</td>
+      <td>Fixed a real bug class: clicks resolving to 2+ elements
+        (<code>cy.click() can only be called on a single element</code>), caused by <code>force: true</code>
+        clicks incorrectly combined with a <code>:visible</code> filter.</td>
+      <td class="mono">curriculum/curriculum_builder.cy.js</td></tr>
+  </table>
+
+  <h3>Still true — carried over unresolved from Week 1 checklist</h3>
+  <ul>
+    <li>MEN-2005 Instructor Finance — <strong>still the #1 zero‑coverage priority</strong>, untouched since 12 Jul</li>
+    <li><code>MEN-XXXX</code> prefix still missing on 12 of the 21 "covered" stories — coverage can only be
+      verified by manual review, not by <code>grep</code>/CI, until this is fixed</li>
+    <li>Jira Parent‑key linkage still broken: only 13 / 966 test cases link to a Story (was ~13/978)</li>
+  </ul>
+</div>
+
+<h2>Coverage Targets</h2>
+<table>
+  <tr><th>Milestone</th><th>Story %</th><th>TC %</th><th>Cypress Tests</th></tr>
+  <tr><td>12 Jul (baseline)</td><td>18%</td><td>16%</td><td>570</td></tr>
+  <tr><td>20 Jul</td><td>~20%</td><td>~18%</td><td>625</td></tr>
+  <tr class="done"><td><strong>2 Aug (now)</strong></td><td>~23%</td><td>~24%*</td><td><strong>691</strong></td></tr>
+  <tr><td>Month 1 target</td><td>30%</td><td>25%</td><td>700</td></tr>
+  <tr><td>Month 2</td><td>40%</td><td>35%</td><td>850</td></tr>
+  <tr><td>Month 4</td><td>50%</td><td>50%</td><td>1100</td></tr>
+</table>
+<p style="font-size:9pt;color:#64748b;">* TC % on 2 Aug is approximate from unique MEN keys in Cypress source (235) vs last Jira export size (~966); re-export Jira for an exact Done-only %. Volume target (~700) is nearly met.</p>
+
+<h2>Phase 1 — Foundation (Weeks 1–2)</h2>
+<div class="phase">
+  <div class="phase-title">Foundation & Quick Wins</div>
+  <div class="phase-meta">Target: +80 TCs · 3 stories</div>
+  <ul>
+    <li>Link all Jira TCs to their Parent Story (AgileTest / Parent key)</li>
+    <li>Add <code>MEN-XXXX</code> prefix to every existing <code>it()</code> block</li>
+    <li><strong>Done (2 Aug):</strong> CI via GitHub Actions <code>cypress.yml</code> (remote env). Still TODO: JUnit/HTML report artifact + Azure/Cypress Cloud sync</li>
+    <li>Stabilize flaky tests: login, navigation auth, flatpickr — <em>partially addressed</em> (API login, soft-pass, payment API cart)</li>
+    <li>Start MEN-2005 Instructor Finance (read-only + PDF export) — <strong>still open</strong></li>
+  </ul>
+</div>
+
+<h2>Phase 2 — High ROI (Weeks 3–6)</h2>
+<div class="phase">
+  <div class="phase-title">High-ROI Features</div>
+  <div class="phase-meta">Target: +200 TCs · 8 stories</div>
+  <ul>
+    <li>MEN-2005 — full Instructor Finance suite (12 TCs)</li>
+    <li>MEN-1956 — purchase currently running sessions</li>
+    <li>MEN-1724 — student attendance system</li>
+    <li>Payment regression: XPay webhook, Apple Pay, voucher edge cases</li>
+    <li>Live Sessions: expired course link-list test (Full Payment path)</li>
+  </ul>
+</div>
+
+<h2>Phase 3 — Core Platform (Weeks 7–10)</h2>
+<div class="phase">
+  <div class="phase-title">Core Platform Coverage</div>
+  <div class="phase-meta">Target: +250 TCs · 15 stories</div>
+  <ul>
+    <li>Course Management — archive, publish, pricing (PPS vs Full Payment)</li>
+    <li>Notifications — unified inbox, WhatsApp CRM (MEN-1727)</li>
+    <li>RBAC — permission matrix for every admin role</li>
+    <li>Auth — parent phone edge cases, email verification negative paths</li>
+    <li>Roster — mobile + desktop parity (MEN-1314–1319)</li>
+  </ul>
+</div>
+
+<h2>Phase 4 — Scale (Weeks 11–16)</h2>
+<div class="phase">
+  <div class="phase-title">Scale & Maintain → 50% Coverage</div>
+  <div class="phase-meta">Target: 50% TC key coverage</div>
+  <ul>
+    <li>Page Object Model for the top 5 flows</li>
+    <li>Shared helpers: <code>createCourse()</code>, <code>createSession()</code>, <code>enrollStudent()</code></li>
+    <li>Nightly full suite on staging · smoke on dev after deploy</li>
+    <li>Automation dashboard: Jira TC status synced from Cypress results</li>
+  </ul>
+</div>
+
+<h2>Priority Queue — Top 10 Stories</h2>
+<table>
+  <tr>
+    <th>#</th><th>Key</th><th>Feature</th><th>TCs</th><th>Effort</th><th>ROI</th><th>Reason</th>
+  </tr>
+  <tr><td>1</td><td>MEN-2005</td><td>Instructor Finance</td><td>12</td><td>M</td><td><span class="badge badge-high">High</span></td><td>Still 0% — top priority, unchanged since 12 Jul</td></tr>
+  <tr class="done"><td>2</td><td>MEN-1555</td><td>Live Sessions shared</td><td>4</td><td>S</td><td><span class="badge badge-done">Done</span></td><td>Automated 20 Jul — <code>live_sessions.cy.js</code></td></tr>
+  <tr class="done"><td>3</td><td>MEN-1457</td><td>XPay migration</td><td>20</td><td>M</td><td><span class="badge badge-done">Done</span></td><td>Reworked 1 Aug — API cart + Mentora-side XPay redirect</td></tr>
+  <tr class="done"><td>4</td><td>MEN-2380</td><td>WhatsApp float widget</td><td>15</td><td>S</td><td><span class="badge badge-done">Done</span></td><td>Automated 1 Aug — MEN-2396–2410 float UX (CRM API still partial)</td></tr>
+  <tr><td>5</td><td>MEN-1727</td><td>WhatsApp CRM (admin)</td><td>15</td><td>L</td><td><span class="badge badge-high">High</span></td><td>Still partial — float done; admin CRM flows remain</td></tr>
+  <tr><td>6</td><td>MEN-1956</td><td>Buy running sessions</td><td>8</td><td>M</td><td><span class="badge badge-med">Medium</span></td><td>Revenue-critical path — still 0%</td></tr>
+  <tr><td>7</td><td>MEN-1724</td><td>Attendance system</td><td>10</td><td>L</td><td><span class="badge badge-med">Medium</span></td><td>New feature — still no coverage</td></tr>
+  <tr class="done"><td>8</td><td>MEN-1370</td><td>Student Schedule</td><td>6</td><td>M</td><td><span class="badge badge-partial">Partial</span></td><td>SAW-020 smoke on <code>/dashboard/my-schedule</code> — expand remaining TCs</td></tr>
+  <tr class="done"><td>9</td><td>MEN-1560</td><td>Email verification</td><td>30</td><td>S</td><td><span class="badge badge-done">Done</span></td><td>Confirmed automated — <code>email_verification.cy.js</code></td></tr>
+  <tr><td>10</td><td>MEN-821–825</td><td>Course Management</td><td>50</td><td>M</td><td><span class="badge badge-med">Medium</span></td><td>Good base — expand edge cases</td></tr>
+  <tr><td>11</td><td>MEN-985</td><td>Mobile App</td><td>1</td><td>XL</td><td><span class="badge badge-low">Low</span></td><td>Native app — exclude from web E2E</td></tr>
+  <tr class="done"><td>12</td><td>MEN-1726</td><td>Instructor Assistants</td><td>33</td><td>L</td><td><span class="badge badge-done">Done</span></td><td>Automated 20 Jul — full permission matrix, 33 TCs</td></tr>
+  <tr class="done"><td>13</td><td>MEN-231</td><td>Instructor ID Verification</td><td>11</td><td>M</td><td><span class="badge badge-done">Done</span></td><td>Automated 20 Jul — register → verify → publish gate</td></tr>
+  <tr class="done"><td>14</td><td>MEN-2126</td><td>Remove Hybrid delivery</td><td>15</td><td>M</td><td><span class="badge badge-done">Done</span></td><td>Automated + stabilized 1 Aug — hang fixed on MEN-2304</td></tr>
+  <tr class="done"><td>15</td><td>—</td><td>Shared Actions web (auth/consume)</td><td>20</td><td>M</td><td><span class="badge badge-done">Done</span></td><td>SAW-001…020 — product Action refactor regression (2 Aug)</td></tr>
+</table>
+
+<h2>Coverage by Feature (Current — 2 Aug direction of travel)</h2>
+<table>
+  <tr><th>Feature</th><th>Stories Automated</th><th>TCs Automated</th><th>Cypress Tests / notes</th></tr>
+  <tr><td>Course Management</td><td>7/15 (47%)</td><td>7/129 (5%)</td><td>+ Hybrid MEN-2126 suite</td></tr>
+  <tr class="done"><td>Payment & Finance</td><td>3/7 (43%)</td><td>↑ edge cases</td><td>XPay + new-tests reworked; Finance MEN-2005 still 0%</td></tr>
+  <tr class="done"><td>Live Sessions / Schedule</td><td>↑ partial</td><td>↑ SAW live + schedule</td><td>live_sessions + SAW-017…020</td></tr>
+  <tr class="done"><td>Notifications & WhatsApp</td><td>↑ float done</td><td>+15 float TCs</td><td>whatsapp_float + prior CRM API specs</td></tr>
+  <tr class="done"><td>Auth & Registration</td><td>↑ Shared Actions</td><td>+ SAW register/login</td><td>password policy + parent phone + SAW-001…009</td></tr>
+  <tr><td>Roster & Students</td><td>3/5 (60%)</td><td>14/41 (34%)</td><td>Unchanged this window</td></tr>
+  <tr><td>RBAC & Admin</td><td>1/6 (17%)</td><td>10/36 (28%)</td><td>TC-NEW-009 admin URL gate</td></tr>
+  <tr><td>CMS & Localization</td><td>1/2 (50%)</td><td>3/7 (43%)</td><td>Unchanged this window</td></tr>
+  <tr class="done"><td>Platform / CI</td><td>—</td><td>—</td><td><code>.github/workflows/cypress.yml</code> live</td></tr>
+</table>
+
+<div class="two-col">
+  <div>
+    <h2>Coding Standards</h2>
+    <ul>
+      <li><code>it('MEN-XXXX | description', () => { ... })</code></li>
+      <li>One file per Story: <code>feature(MEN-XXX).cy.js</code></li>
+      <li><code>before()</code> creates data · <code>it()</code> asserts only</li>
+      <li><code>loginViaApi()</code> for speed · UI login only when required</li>
+      <li>Tags: <code>@smoke</code> <code>@regression</code> <code>@men-XXXX</code></li>
+      <li>No hard waits &gt; 3 seconds</li>
+    </ul>
+  </div>
+  <div>
+    <h2>Exclude from E2E Target</h2>
+    <ul>
+      <li>MEN-985 Mobile native app</li>
+      <li>MEN-1482 Staging Server / infrastructure</li>
+      <li>MEN-1495 Database backup</li>
+      <li>Manual exploratory / subjective UX tests</li>
+      <li>WhatsApp production send tests</li>
+      <li>FCM push <em>send</em> (Firebase Admin) — not implemented in product</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Week 1 — Checklist (status 2 Aug)</h2>
+<ul class="checklist">
+  <li>Link all Jira TCs to Parent Story in AgileTest — still open</li>
+  <li>Add MEN-XXXX prefix to all existing it() blocks — still partial</li>
+  <li><strong>✓ Done:</strong> CI <code>cypress run</code> on GitHub Actions (artifacts on fail). TODO: richer HTML/JUnit publish</li>
+  <li>Create instructor_finance(MEN-2005).cy.js skeleton — still open</li>
+  <li><strong>✓ Done:</strong> Document test data users in support/users.js</li>
+  <li>Single repo strategy / cleanup — ongoing</li>
+</ul>
+
+<h2>Next actions (post–2 Aug)</h2>
+<ul class="checklist">
+  <li>Upgrade Actions to Node-24-ready <code>checkout</code> / <code>setup-node</code></li>
+  <li>HTML/Mochawesome report artifact on every CI run</li>
+  <li>MEN-2005 Instructor Finance skeleton + read-only cases</li>
+  <li>Optional: mobile <code>/api/v1/devices</code> smoke; Cypress Cloud record key</li>
+</ul>
+
+<h2>Team Estimate</h2>
+<table>
+  <tr><th>Team</th><th>Velocity</th><th>Reach 50% in</th></tr>
+  <tr><td>1 QA Engineer</td><td>~10 TCs/week</td><td>~10 months</td></tr>
+  <tr><td>2 QA Engineers</td><td>~20 TCs/week</td><td>~5 months</td></tr>
+</table>
+<p><strong>Suggested split:</strong> QA1 → Payment + Finance + Live Sessions · QA2 → Courses + Auth + Notifications</p>
+
+<h2>How Coverage Is Measured</h2>
+<table>
+  <tr><th>Metric</th><th>Definition</th><th>12 Jul</th><th>20 Jul</th><th>2 Aug</th></tr>
+  <tr><td>Story automated (literal key)</td><td>MEN story key appears in a Cypress file (name or source)</td><td>19 / 104</td><td>9 / 105</td><td>↑ (+Hybrid, WhatsApp float keys)</td></tr>
+  <tr><td>Story automated (incl. verified untagged)</td><td>+ stories manually confirmed covered under a differently‑named spec</td><td>—</td><td>21 / 105 (20%)</td><td>~24 / 105 (~23%) incl. Shared Actions</td></tr>
+  <tr><td>TC automated (literal MEN keys)</td><td>Unique MEN-* keys appearing in Cypress source</td><td>154 / 978</td><td>177 / 966</td><td>235 unique MEN refs</td></tr>
+  <tr><td>TC automated ("Done" only)</td><td>Same, restricted to TCs Jira marks Done — needs fresh Jira export</td><td>—</td><td>45 / 339 (13.3%)</td><td>re-measure after Jira export</td></tr>
+  <tr><td>Test volume</td><td>Cypress <code>it()</code> count</td><td>570</td><td>625</td><td><strong>691</strong> / 47 specs</td></tr>
+</table>
+<p><em>Note: 12 Jul → 20 Jul Jira export sizes shifted (978 → 966 TCs). 2 Aug story/TC % uses repo grep + manual suite mapping
+(Shared Actions uses SAW-* IDs, not MEN keys). Re-export Jira and fix Parent-key linking for exact Done-only tracking.</em></p>
+
+<footer>
+  Mentora Automation Conversion Plan · Generated 12 Jul 2026 · Updated 20 Jul 2026 · <strong>Updated 2 Aug 2026</strong> · Source: Jira CSV exports + cypress/e2e
+</footer>
+
+</body>
+</html>

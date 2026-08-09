@@ -1,0 +1,16 @@
+Key,Type,Summary,Expected
+MEN-2396,Positive,WhatsApp floating button is visible on the homepage for a guest,#mentora-whatsapp-float is visible after page load
+MEN-2397,Positive,Floating button is shown across all public pages (courses/login/register/about-us/contact-us),Widget visible on every public page tested
+MEN-2398,Positive,Button is a fixed-position widget rendered outside normal page flow,Widget has role="complementary" and fixed CSS positioning
+MEN-2399,Positive,Button displays the WhatsApp brand icon,i.la-whatsapp icon exists inside the link
+MEN-2400,Positive,Clicking the button opens a chat via the existing wa.me URL,Link href matches https://wa.me/201225269444 with a pre-filled text param
+MEN-2401,Positive,WhatsApp link opens in a new tab without exposing opener,Link has target="_blank" and rel="noopener"
+MEN-2402,Positive,wa.me link carries a localized pre-filled greeting message,text= query param decodes to a non-empty greeting
+MEN-2403,Positive,Dismiss (close) button is present and accessible,.mentora-whatsapp-float__dismiss visible with an aria-label
+MEN-2404,Positive,Clicking dismiss immediately hides the floating button,Widget removed/hidden from the page right after the click
+MEN-2405,Positive,Dismissal persists across a reload of the same page,Widget stays hidden after cy.reload()
+MEN-2406,Positive,Dismissal persists across visits to different public pages,Widget stays hidden when navigating to another public page after dismissal
+MEN-2407,Positive,Floating button is also shown to authenticated users on the main site layout,Widget visible on /dashboard for a logged-in student
+MEN-2408,Positive,Button and its labels are localized in Arabic,aria-labels and wa.me greeting text render in Arabic under /locale/ar
+MEN-2409,Negative,Floating button is not shown inside the admin panel layout,#mentora-whatsapp-float absent on /admin pages
+MEN-2410,Positive,Dismissal can be reset — clearing local storage restores the button on next visit,Widget reappears once mentora_whatsapp_float_dismissed is cleared

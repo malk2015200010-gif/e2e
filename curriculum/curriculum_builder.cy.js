@@ -7,7 +7,7 @@
  *   - Selectors match confirmed dev.mentoraeg.com HTML
  */
 
-import { visitWithAuth, loginViaApi } from '../../support/navigation.js'
+import { loginViaApi } from '../../support/navigation.js'
 import { HTTP_AUTH, ADMIN, INSTRUCTOR, STUDENT } from '../../support/users.js'
 
 const BASE = 'https://dev.mentoraeg.com'
@@ -28,12 +28,8 @@ const go = (path) =>
   cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false })
 
 const loginInstructorUI = () => {
-  cy.clearCookies()
-  cy.clearLocalStorage()
-  visitWithAuth('login')
-  cy.get('input[type="email"]:visible', { timeout: 10000 }).clear().type(INSTRUCTOR.email)
-  cy.get('input[id="password"]:visible').clear().type(INSTRUCTOR.password)
-  cy.get('button.btn.btn-primary').click({ force: true })
+  loginViaApi(INSTRUCTOR)
+  go('/dashboard')
   cy.url({ timeout: 20000 }).should('include', '/dashboard')
 }
 
@@ -84,13 +80,23 @@ const clickNewSection = () => {
     .should('exist')
 }
 
-const typeSectionName = (name, mode = 'create') => {
-  const sel =
-    mode === 'edit'
-      ? '.curriculum-section-form-panel[data-mode="edit"] input[name="section_name"]'
-      : 'input[name="section_name"].curriculum-section-name-input'
+const visibleEditPanel = () =>
+  cy.get('.curriculum-section-form-panel[data-mode="edit"]:visible', { timeout: 10000 }).first()
 
-  cy.get(sel, { timeout: 10000 })
+const typeSectionName = (name, mode = 'create') => {
+  if (mode === 'edit') {
+    visibleEditPanel()
+      .find('input[name="section_name"]')
+      .first()
+      .click({ force: true })
+      .clear({ force: true })
+      .type(name, { force: true })
+      .blur({ force: true })
+    return
+  }
+
+  cy.get('input[name="section_name"].curriculum-section-name-input', { timeout: 10000 })
+    .filter(':visible')
     .first()
     .click({ force: true })
     .clear({ force: true })
@@ -99,18 +105,30 @@ const typeSectionName = (name, mode = 'create') => {
 }
 
 const submitCreateSection = () => {
-  cy.get('.curriculum-section-form-footer button.btn-curriculum-primary[type="submit"]')
+  cy.get('.curriculum-section-form-panel[data-mode="create"]')
+    .find('.curriculum-section-form-footer button.btn-curriculum-primary[type="submit"]')
     .first()
     .scrollIntoView()
     .click({ force: true })
 }
 
 const submitUpdateSection = () => {
-  cy.get('.curriculum-section-form-panel[data-mode="edit"]')
-    .find('.curriculum-section-form-footer button.btn-curriculum-primary[name="save"]')
+  visibleEditPanel()
+    .find(
+      '.curriculum-section-form-footer button.btn-curriculum-primary[type="submit"], ' +
+        '.curriculum-section-form-footer button.btn-curriculum-primary[name="save"]'
+    )
+    .filter(':visible')
+    .first()
     .scrollIntoView()
     .click({ force: true })
 }
+
+const sectionByName = (name) =>
+  sidebar()
+    .find('.dashboard-course-section')
+    .filter((_, el) => Cypress.$(el).text().includes(name))
+    .first()
 
 const addSection = (name) => {
   assertOnCurriculum()
@@ -125,21 +143,21 @@ const addSection = (name) => {
 const renameSection = (newName) => {
   cy.intercept('POST', '**/update-section/**').as('updateSection')
   hideDebugBar()
-  sidebar().find('button.section-edit-btn').first().click({ force: true })
-  cy.get('.curriculum-section-form-panel[data-mode="edit"]', { timeout: 10000 }).should('exist')
+
+  sectionByName(sectionName).find('button.section-edit-btn').first().click({ force: true })
+  visibleEditPanel().should('exist')
   typeSectionName(newName, 'edit')
   submitUpdateSection()
-  cy.wait('@updateSection', { timeout: 20000 })
-  cy.reload()
-  goCurriculum()
-  sidebar().find('.dashboard-course-section').first().should('contain.text', newName)
+
+  cy.wait('@updateSection', { timeout: 20000 }).its('response.statusCode').should('be.oneOf', [200, 201, 302])
+  sectionByName(newName).should('exist')
   sectionName = newName
 }
 
 // ─── Items ────────────────────────────────────────────────────────────────────
 
 const openAddMenu = () => {
-  addItemWrap().find('.curriculum-add-item-toggle').click({ force: true })
+  addItemWrap().find('.curriculum-add-item-toggle').first().click({ force: true })
   addItemWrap().find('ul.curriculum-add-item-menu').should('exist')
 }
 
@@ -150,7 +168,7 @@ const openItemBuilder = (type) => {
     assignment: 'a.new-assignment-btn',
   }
   openAddMenu()
-  addItemWrap().find(links[itemType(type)]).click({ force: true })
+  addItemWrap().find(links[itemType(type)]).first().click({ force: true })
   cy.wait(400)
 }
 
@@ -173,11 +191,11 @@ const fillItemTitle = (title, type) => {
 const saveItem = (type) => {
   const key = itemType(type)
   if (key === 'lecture') {
-    lecturePanel().find('button.btn-save-lecture').click({ force: true })
+    lecturePanel().find('button.btn-save-lecture').first().click({ force: true })
   } else if (key === 'quiz') {
-    quizPanel().find('#quiz-builder-settings-form button.btn-save-quiz').click({ force: true })
+    quizPanel().find('#quiz-builder-settings-form button.btn-save-quiz').first().click({ force: true })
   } else {
-    assignmentPanel().find('button.btn-save-assignment').click({ force: true })
+    assignmentPanel().find('button.btn-save-assignment').first().click({ force: true })
   }
   cy.get('.dashboard-curriculum-wrap', { timeout: 20000 }).should('exist')
   assertOnCurriculum()
@@ -194,6 +212,7 @@ const openSidebarItem = (title) => {
   sidebar()
     .find('.edit-curriculum-item')
     .contains(title)
+    .first()
     .closest('.section-item-top')
     .click({ force: true })
   cy.wait(500)
@@ -207,7 +226,7 @@ const cancelItemEdit = (type = 'lecture') => {
     quiz: () => quizPanel().find('button.btn-quiz-builder-close'),
     assignment: () => assignmentPanel().find('button.btn-assignment-builder-close'),
   }
-  close[itemType(type)]().click({ force: true })
+  close[itemType(type)]().first().click({ force: true })
   cy.wait(400)
 }
 
@@ -233,14 +252,55 @@ const buildCurriculum = () => {
 
 // ─── Publish ──────────────────────────────────────────────────────────────────
 
-const ensureCoursePricing = () => {
+const selectPaidPricingOption = () => {
+  cy.get('img[src*="paid.svg"]', { timeout: 10000 })
+    .should('be.visible')
+    .then(($img) => {
+      let $target = $img.closest(
+        'label, button, a, [role="button"], [data-pricing-type], .pricing-type-card, .pricing-option'
+      )
+      if (!$target.length) $target = $img.parent()
+      cy.wrap($target.first()).click({ force: true })
+    })
+}
+
+const fillTotalPrice = (price = '100') => {
+  cy.contains('label, span, p, div', /Total Price/i, { timeout: 10000 })
+    .first()
+    .closest('.form-group, .mb-3, .row, .card-body, div')
+    .find('input[type="text"], input[type="number"]')
+    .filter(':visible')
+    .first()
+    .clear({ force: true })
+    .type(price, { force: true })
+}
+
+const ensureCoursePricing = (price = '100') => {
   go(`/dashboard/courses/${courseId}/pricing`)
   cy.get('body', { timeout: 15000 }).should('exist')
-  cy.get('input[name="price"], input[name="course_price"], input#price').filter(':visible').first().then(($el) => {
-    if ($el.length) cy.wrap($el).clear({ force: true }).type('0', { force: true })
+  hideDebugBar()
+
+  cy.intercept('POST', '**/pricing**').as('setPricing')
+
+  // 1) Paid card (paid.svg) — price fields appear only after this
+  selectPaidPricingOption()
+
+  // 2) Full Payment tab (default after Paid; click if present but inactive)
+  cy.get('body').then(($body) => {
+    const $tab = $body
+      .find('button, a, [role="tab"], .nav-link')
+      .filter((_, el) => /^Full Payment$/i.test((el.textContent || '').trim()))
+      .first()
+    if ($tab.length && !$tab.hasClass('active')) {
+      cy.wrap($tab).click({ force: true })
+    }
   })
-  cy.contains('button, input[type="submit"]', /save|update/i).first().click({ force: true })
-  cy.wait(1000)
+
+  // 3) Total Price + 4) Set Pricing
+  fillTotalPrice(price)
+  cy.contains('button', /Set Pricing/i).should('be.visible').click({ force: true })
+
+  cy.wait('@setPricing', { timeout: 20000 }).its('response.statusCode').should('be.oneOf', [200, 201, 302])
 }
 
 const publishAndApproveCourse = () => {
@@ -257,7 +317,7 @@ const publishAndApproveCourse = () => {
       return
     }
     if (!/pending state/i.test(text)) {
-      cy.get('button[name="publish_btn"][value="publish"]').click({ force: true })
+      cy.get('button[name="publish_btn"][value="publish"]').first().click({ force: true })
       cy.wait(2000)
     }
   })
@@ -292,9 +352,9 @@ describe('Curriculum Builder', { testIsolation: false }, () => {
     cy.wait(1000)
     cy.get('#course_category').select('22', { force: true })
     cy.wait(1500)
-    cy.contains('label', 'Topic').parent().find('.select2-selection').click({ force: true })
-    cy.contains('.select2-results__option', 'Math').click({ force: true })
-    cy.contains('button', /create course/i).click({ force: true })
+    cy.contains('label', 'Topic').parent().find('.select2-selection').first().click({ force: true })
+    cy.contains('.select2-results__option', 'Math').first().click({ force: true })
+    cy.contains('button', /create course/i).first().click({ force: true })
     cy.wait(2000)
 
     cy.url({ timeout: 20000 }).then((url) => {

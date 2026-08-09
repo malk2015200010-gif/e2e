@@ -1,0 +1,62 @@
+TC ID,Module,Test Case,Expected Result
+XPAY-001,Configuration,Verify pilot XPay API credentials are configured via environment variables (API key + signing_key),Credentials load correctly; no secrets exposed in client-side code or logs
+XPAY-002,Configuration,Verify webhook endpoint URL is registered in XPay Settings Page,Webhook URL matches Mentora pilot callback route
+XPAY-003,Configuration,Verify signing_key from XPay Settings matches server-side secret used for verification,Keys match byte-for-byte; mismatch causes verification failure in test harness
+XPAY-004,Configuration,Verify legacy XPay integration code paths are removed or feature-flagged off after migration,No deprecated endpoints called during checkout/payment flow
+XPAY-005,Payment Creation,Create payment session using new XPay API for a single paid course checkout,API returns success with payment reference/transaction ID; user redirected to XPay checkout or embedded flow opens
+XPAY-006,Payment Creation,Create payment session with correct amount currency and order metadata (course ID user ID),Request payload matches cart total; metadata stored for reconciliation
+XPAY-007,Payment Creation,Create payment session for mixed cart (multiple courses),Single payment created for combined total; all line items linked to transaction
+XPAY-008,Payment Creation,Create payment session with valid voucher/discount applied,Discounted amount sent to XPay; original and final amounts auditable
+XPAY-009,Payment Creation,Reject payment creation when cart is empty,API returns validation error; no XPay session created
+XPAY-010,Payment Creation,Reject payment creation when course price was tampered client-side,Server recalculates price; payment created with server-side amount only (regression: TC-NEW-002)
+XPAY-011,Payment Creation,Prevent duplicate payment when pending payment already exists for same user/cart,Second payment blocked; user sees pending payment message (regression: TC-NEW-001 / TC-NEW-004)
+XPAY-012,Payment Creation,Handle XPay API timeout during payment creation,User sees friendly error; payment record remains pending or not created; retry allowed
+XPAY-013,Payment Creation,Handle XPay API 4xx/5xx during payment creation,Error logged; no false success state; user can retry checkout
+XPAY-014,Payment Status,Successful payment callback updates transaction status to PAID/COMPLETED,Payment record status updated; enrollment granted
+XPAY-015,Payment Status,Failed/declined payment callback updates status to FAILED,Payment marked failed; user not enrolled; cart remains or can retry
+XPAY-016,Payment Status,Pending payment remains PENDING until final webhook or status poll,No premature enrollment; UI shows pending state
+XPAY-017,Payment Status,Student with pending payment is not shown in instructor enrolled roster,Pending-only students excluded (regression: MEN-1257)
+XPAY-018,Payment Status,Payment status query via new XPay API returns consistent state with internal DB,External status matches internal payment record
+XPAY-019,Payment Status,User redirected to success page only after verified successful payment,Success page not shown on pending/failed transactions
+XPAY-020,Payment Status,User redirected to failure/cancel page on declined or abandoned payment,Failure page shown; user can return to checkout
+XPAY-021,Webhook HMAC,Accept webhook with valid HMAC-SHA512 signature in xpay-signature header,HTTP 200 returned; payment status processed
+XPAY-022,Webhook HMAC,Verify signature computed from raw request body bytes (not re-serialized JSON),Valid signature passes; whitespace/key-order changes fail if body altered
+XPAY-023,Webhook HMAC,Reject webhook with missing xpay-signature header,HTTP 401/403 returned; payment status not updated
+XPAY-024,Webhook HMAC,Reject webhook with invalid/tampered xpay-signature header,HTTP 401/403 returned; event ignored; security log recorded
+XPAY-025,Webhook HMAC,Reject webhook signed with wrong signing_key,HTTP 401/403 returned; no side effects on payment/enrollment
+XPAY-026,Webhook HMAC,Reject webhook with valid signature but modified payload body,HTTP 401/403 returned; tampered data not persisted
+XPAY-027,Webhook ECDSA,Accept webhook with valid ECDSA signature in xpay-private-signature header (if integration uses ECDSA),HTTP 200 returned; payment status processed
+XPAY-028,Webhook ECDSA,Reject webhook with invalid xpay-private-signature header,HTTP 401/403 returned; event ignored
+XPAY-029,Webhook Security,Ensure signing_key/secret is never logged or returned in API responses,Logs and responses contain no secret values
+XPAY-030,Webhook Security,Ensure webhook endpoint requires POST and rejects GET/PUT/DELETE probes,Unsupported methods return 405/404; no state change
+XPAY-031,Webhook Security,Replay attack — resend old valid webhook with same eventId,Duplicate ignored idempotently; no double enrollment or double charge
+XPAY-032,Webhook Security,Webhook from non-XPay IP/user-agent without valid signature is rejected,HTTP 401/403; no processing
+XPAY-033,Webhook Idempotency,Process same webhook event twice (XPay retry simulation),Second delivery handled idempotently; single enrollment/charge
+XPAY-034,Webhook Idempotency,Concurrent duplicate webhooks for same transaction processed safely,Only one state transition applied; no race-condition duplicate enrollments
+XPAY-035,Webhook Retries,Return HTTP 200 within 2-second timeout — XPay does not retry unnecessarily,Single processing; no duplicate side effects
+XPAY-036,Webhook Retries,Return HTTP 500 — XPay retries with exponential backoff,Eventually succeeds when server recovers; still idempotent
+XPAY-037,Webhook Retries,Return HTTP 401 for invalid signature — XPay does not mark transaction as processed on Mentora side,Payment remains unchanged; invalid callbacks never update DB
+XPAY-038,Checkout Regression,Student completes full checkout flow end-to-end in pilot (course → cart → pay → success),Course access granted; receipt/confirmation visible
+XPAY-039,Checkout Regression,Checkout with expired voucher shows validation error and blocks payment (TC-NEW-005),Expired voucher rejected; no XPay session for invalid discount
+XPAY-040,Checkout Regression,Double-click pay button does not create duplicate payments (TC-NEW-003),Only one payment request processed
+XPAY-041,Checkout Regression,Free course checkout bypasses XPay and enrolls directly,No XPay call; enrollment immediate
+XPAY-042,Checkout Regression,Checkout page displays correct total before redirect to XPay,Displayed amount matches server-calculated amount sent to XPay
+XPAY-043,Admin & Reporting,Successful XPay payment appears in admin payments panel with correct amount,Payment record visible with matching transaction reference
+XPAY-044,Admin & Reporting,Failed XPay payment appears with failed status in admin/reporting,Failed transaction auditable; no false paid status
+XPAY-045,Admin & Reporting,Webhook processing errors are logged with eventId and transaction reference,Ops can trace failed webhook handling
+XPAY-046,Pilot Environment,Full smoke test suite passes against pilot XPay credentials,All critical XPAY-* cases pass in pilot
+XPAY-047,Pilot Environment,Test transaction in pilot sandbox completes and webhook received on pilot callback URL,End-to-end pilot flow verified
+XPAY-048,Pilot Environment,Pilot signing_key rotation test — update key in env and XPay settings,Webhooks verify with new key; old key rejected
+XPAY-049,Production Readiness,Production credentials and webhook URL documented and stored securely (not in repo),Runbook available for ops; secrets in vault/env only
+XPAY-050,Production Readiness,Feature flag/toggle allows switching from legacy to new XPay integration,Toggle enables new API without downtime
+XPAY-051,Production Readiness,Rollback plan verified — revert to legacy integration if pilot issues found,Rollback tested; no data corruption
+XPAY-052,Production Readiness,Monitoring/alerting configured for webhook verification failures,Alert fires on spike of 401 signature failures
+XPAY-053,Production Readiness,Monitoring/alerting configured for payment creation failures and status mismatches,Alert fires on XPay API errors or stuck pending payments
+XPAY-054,Negative — Webhook,Send webhook with empty body and no signature,HTTP 401/400 returned; no DB update
+XPAY-055,Negative — Webhook,Send webhook with malformed JSON payload and valid-looking signature,HTTP 400 returned; no partial DB update
+XPAY-056,Negative — Webhook,Send webhook for unknown/non-existent transaction ID,HTTP 404 or ignored safely; logged for investigation
+XPAY-057,Negative — Webhook,Send webhook with SUCCESS status for already-completed payment,Idempotent no-op; no duplicate enrollment
+XPAY-058,Negative — Payment,Attempt payment creation with invalid/missing XPay API credentials,Clear error; no orphan payment records
+XPAY-059,Negative — Payment,Attempt checkout while logged out,Redirect to login; no payment created
+XPAY-060,Localization,Checkout and payment error messages render correctly in EN locale,English messages shown for payment failures/pending states
+XPAY-061,Localization,Checkout and payment error messages render correctly in AR locale,Arabic messages shown for payment failures/pending states

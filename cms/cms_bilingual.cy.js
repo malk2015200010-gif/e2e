@@ -15,7 +15,7 @@ import { visitWithAuth, loginViaApi } from '../../support/navigation'
 import { HTTP_AUTH, ADMIN } from '../../support/users'
 
 const BASE   = 'https://dev.mentoraeg.com'
-const AUTH   = { username: HTTP_AUTH.username, password: HTTP_AUTH.password }
+const AUTH = HTTP_AUTH
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,15 @@ function visitPublic(path) {
 function loginAndVisitCms(path = '') {
   loginViaApi(ADMIN)
   cy.visit(`${BASE}/admin/cms${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.get('body', { timeout: 15000 }).should('exist')
+}
+
+// Posts live under /admin/cms/post/... (the "Create New Post" button on the
+// /admin/cms list points to /admin/cms/post/create — NOT /admin/cms/create,
+// which 404s).
+function loginAndVisitCmsPost(path = '') {
+  loginViaApi(ADMIN)
+  cy.visit(`${BASE}/admin/cms/post${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 }
 
@@ -40,12 +49,19 @@ function loginAndVisitCmsPage(path = '') {
 // ════════════════════════════════════════════════════════════════════════════════
 
 it('MEN-882 | About Us page is publicly accessible at /about-us (200 response)', () => {
+  // Check the real HTTP status directly — checking body text for a bare '404'
+  // is unreliable because the Laravel Debugbar (enabled on dev) injects debug
+  // JSON into every page that can incidentally contain the substring '404'.
+  cy.request({ url: `${BASE}/about-us`, auth: AUTH, failOnStatusCode: false }).then((res) => {
+    expect(res.status).to.eq(200)
+  })
+
   visitPublic('/about-us')
 
   cy.url().then((url) => { cy.log('About Us URL: ' + url) })
   cy.get('body').should('be.visible')
   cy.get('body').should('not.contain.text', 'Error 500')
-  cy.get('body').should('not.contain.text', '404')
+  cy.get('body').should('not.contain.text', 'Page Not Found')
   cy.log('PASS: About Us page is accessible ✓')
 })
 
@@ -120,7 +136,7 @@ it('MEN-887 | About Us page is responsive on mobile viewport (375px)', () => {
 // ════════════════════════════════════════════════════════════════════════════════
 
 it('MEN-927 | Admin can access CMS create form and fill English-only content', () => {
-  loginAndVisitCms('/create')
+  loginAndVisitCmsPost('/create')
 
   cy.get('body').should('not.contain.text', '403 Forbidden')
   cy.get('body').should('not.contain.text', 'Error 500')
@@ -136,7 +152,7 @@ it('MEN-927 | Admin can access CMS create form and fill English-only content', (
 })
 
 it('MEN-928 | CMS create form has Arabic content fields (bilingual in one form)', () => {
-  loginAndVisitCms('/create')
+  loginAndVisitCmsPost('/create')
 
   cy.get('body').should('not.contain.text', '403 Forbidden')
 
@@ -151,7 +167,7 @@ it('MEN-928 | CMS create form has Arabic content fields (bilingual in one form)'
 })
 
 it('MEN-929 | Arabic version is optional — English-only save does not require Arabic fields', () => {
-  loginAndVisitCms('/create')
+  loginAndVisitCmsPost('/create')
 
   cy.get('body').should('not.contain.text', 'Error 500')
 
@@ -193,22 +209,23 @@ it('MEN-930 | Admin can open CMS post edit screen with both language tabs', () =
   })
 })
 
-it('MEN-931 | Saving CMS post does not create duplicates — POST to /admin/cms returns valid response', () => {
+it('MEN-931 | Saving CMS post does not create duplicates — POST to /admin/cms/post/create returns valid response', () => {
   loginViaApi(ADMIN)
 
-  // Get CSRF token
+  // Get CSRF token from the actual create form (not /login)
   cy.request({
     method: 'GET',
-    url: `${BASE}/login`,
+    url: `${BASE}/admin/cms/post/create`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((r) => {
     const token = (r.body.match(/name="_token"\s+value="([^"]+)"/) || [])[1] || ''
 
-    // Verify that creating with duplicate slug returns 422/redirect, not 200 duplicate
+    // Verify that creating with empty required fields returns a validation
+    // error/redirect, not a 500, and does not silently create a duplicate.
     cy.request({
       method: 'POST',
-      url: `${BASE}/admin/cms`,
+      url: `${BASE}/admin/cms/post/create`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: false,
@@ -221,9 +238,9 @@ it('MEN-931 | Saving CMS post does not create duplicates — POST to /admin/cms 
         status: 'draft',
       },
     }).then((res) => {
-      cy.log(`POST /admin/cms (empty) → ${res.status}`)
+      cy.log(`POST /admin/cms/post/create (empty) → ${res.status}`)
       expect(res.status).to.not.eq(500)
-      if (res.status === 422) {
+      if (res.status === 422 || res.status === 302) {
         cy.log('PASS: Validation error on empty create — no duplicate created ✓')
       } else {
         cy.log(`INFO: ${res.status} — server handled empty post request`)

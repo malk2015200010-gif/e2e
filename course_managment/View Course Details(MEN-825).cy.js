@@ -25,13 +25,16 @@ it('Positive - instructor info visible', () => {
 
 })
 
+// The "Live Class Schedule" widget (button.live-schedule-toggle +
+// #liveScheduleCollapse) only renders on courses that actually have live
+// sessions — not on every course. The catalog's first card is whatever
+// course happens to sort first (often a "Recorded" one), so these tests
+// target a known live-sessions course directly instead of "the first card".
+const LIVE_SESSIONS_COURSE_SLUG = 'live-course-1'
+
 it('Positive - course schedule visible', () => {
 
-  visitWithAuth('courses')
-
-  cy.get('[class*="course-card mb-4"]').first().within(() => {
-    cy.get('a, button').first().click({ force: true })
-  })
+  visitWithAuth(`courses/${LIVE_SESSIONS_COURSE_SLUG}`)
 
   cy.contains(/session|schedule/i).should('be.visible')
 
@@ -39,11 +42,8 @@ it('Positive - course schedule visible', () => {
 
 it('Positive - open live class schedule', () => {
 
-  visitWithAuth('courses')
+  visitWithAuth(`courses/${LIVE_SESSIONS_COURSE_SLUG}`)
 
-  cy.get('[class*="course-card mb-4"]').first().within(() => {
-    cy.get('a, button').first().click({ force: true })
-  })
   cy.get('button.live-schedule-toggle')
     .click({ force: true })
 
@@ -54,10 +54,8 @@ it('Positive - open live class schedule', () => {
 
 it('Live schedule toggle works', () => {
 
-  visitWithAuth('courses')
-cy.get('[class*="course-card mb-4"]').first().within(() => {
-    cy.get('a, button').first().click({ force: true })
-  })
+  visitWithAuth(`courses/${LIVE_SESSIONS_COURSE_SLUG}`)
+
   cy.get('button.live-schedule-toggle')
     .click({ force: true })
 
@@ -80,7 +78,14 @@ it('Positive - course price visible', () => {
     cy.get('a, button').first().click({ force: true })
   })
 
-  cy.contains(/EGP|\$/).should('be.visible')
+  // Course can be either paid ("EGP180.00") or "Free" — scope to the real
+  // price element instead of a bare cy.contains(), which can match the
+  // literal "EGP" hidden inside an analytics <script> tag (currency: "EGP")
+  // or the Debugbar's injected debug data, neither of which is visible.
+  cy.get('.course-landing-page-price-wrap, .price-html-wrap')
+    .should('be.visible')
+    .invoke('text')
+    .should('match', /EGP|Free|\$/i)
 
 })
 

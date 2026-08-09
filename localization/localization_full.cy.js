@@ -24,7 +24,7 @@ import { HTTP_AUTH, ADMIN, ADMINS, INSTRUCTOR, STUDENT } from '../../support/use
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE = 'https://dev.mentoraeg.com'
-const AUTH = { username: HTTP_AUTH.username, password: HTTP_AUTH.password }
+const AUTH = HTTP_AUTH
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

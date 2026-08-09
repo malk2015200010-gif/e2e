@@ -1,0 +1,30 @@
+Test ID,Type,Title,Preconditions,Steps,Expected Result
+MEN-2135,Positive,Instructor can create an assistant,Instructor logged in,Nav Assistants → Create → fill form → save,Assistant appears in list
+MEN-2140,Negative,Duplicate email blocked,Instructor logged in,Create assistant with existing email,Error shown; assistant not created
+MEN-2141,Negative,Required fields validation,On create assistant page,Submit with empty name/email/password,Validation errors shown
+MEN-2142,Positive,Assistant login shows Working for teacher,Assistant created,Login as assistant,Dashboard shows Working for {Teacher}
+MEN-2143,Negative,Deactivated assistant cannot login,Assistant exists,Deactivate → attempt login,Login blocked
+MEN-2144,Positive,Create courses with permission,Assistant has courses.create,Open /dashboard/courses/new,New course form accessible
+MEN-2145,Negative,Cannot create courses without permission,Assistant has no create perm,Open /dashboard/courses/new,Access denied / redirected
+MEN-2146,Positive,Edit public course info with permission,Assistant has courses.public_info,Open instructor course edit,Title field editable
+MEN-2147,Negative,Cannot edit course info without permission,No public_info perm,Open course edit page,Access denied
+MEN-2148,Positive,Edit curriculum with permission,Assistant has courses.syllabus,Open curriculum page,Curriculum builder accessible
+MEN-2149,Negative,Cannot edit curriculum without permission,No syllabus perm,Open curriculum page,Access denied
+MEN-2150,Positive,Edit pricing with permission,Assistant has courses.pricing,Open pricing page,Pricing form accessible
+MEN-2151,Negative,Cannot edit pricing without permission,No pricing perm,Open pricing page,Access denied
+MEN-2152,Positive,Manage live sessions with permission,Assistant has live_sessions.manage,Open live sessions,Session list/actions visible
+MEN-2153,Negative,Cannot manage live sessions without permission,No live_sessions perm,Open live sessions,Access denied
+MEN-2154,Positive,Host sessions via teacher Zoom,Assistant has live_sessions.manage,Open live sessions,Start/host controls available
+MEN-2155,Positive,View enrolled students with permission,Assistant has courses.students.view,Open course roster,Enrolled students visible
+MEN-2156,Negative,Cannot view enrolled students without permission,No students.view perm,Open course page,Access denied
+MEN-2157,Positive,Grade assignments with permission,Assistant has grading.manage,Open assignments,Grading page accessible
+MEN-2158,Negative,Cannot grade without permission,No grading perm,Open assignments,Access denied
+MEN-2159,Positive,View earning with permission,Assistant has earnings.view,Open /dashboard/earning,Earning page accessible; nav link visible
+MEN-2160,Negative,Cannot view earning without permission,No earnings.view perm,Open /dashboard/earning,Redirected to /dashboard; no earning nav link
+MEN-2161,Positive,View withdraws with permission,Assistant has withdraw.view,Open /dashboard/withdraw,Withdraw page accessible
+MEN-2162,Negative,Cannot open withdraws without permission,No withdraw.view,Open /dashboard/withdraw,Access denied / redirected away from /dashboard/withdraw
+MEN-2163,Negative,Cannot manage other assistants,Any assistant logged in,Open /dashboard/assistants,Access denied
+MEN-2164,Negative,Cannot connect/disconnect Zoom,Assistant logged in,Open Zoom settings,Access denied
+MEN-2165,Negative,Cannot archive/unarchive courses,Assistant logged in,Open my courses,No archive controls
+MEN-2166,Positive,Menu items match permissions,Assistant with live_sessions only,Login as assistant,Live Sessions visible; others hidden
+MEN-2167,Positive,No permissions = read-only,Assistant with zero permissions,Login as assistant,Dashboard only; write actions blocked

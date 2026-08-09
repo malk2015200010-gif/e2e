@@ -1,0 +1,109 @@
+Warning: The allowCypressEnv configuration option is enabled. This allows any browser code to read values from Cypress.env(). This is insecure and will be removed in a future major version.
+
+1. Replace Cypress.env() calls with cy.env() (for sensitive values) or Cypress.expose() (for public configuration)
+2. Set allowCypressEnv: false in your Cypress configuration to disable Cypress.env()
+
+Learn more: https://on.cypress.io/cypress-env-migration
+
+
+======================================================================================
+
+  (Run Starting)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Cypress:        15.18.0                                                                        │
+  │ Browser:        Electron 138 (headless)                                                        │
+  │ Node Version:   v24.14.1 (/usr/local/bin/node)                                                 │
+  │ Specs:          1 found (parent_phone.cy.js)                                                   │
+  │ Searched:       cypress/e2e/parent_phone/parent_phone.cy.js                                    │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                    
+  Running:  parent_phone.cy.js                                                              (1 of 1)
+
+
+  AC — Registration (email)
+    ✓ PP-REG-01 | Parent phone field shown on email registration form (2663ms)
+    ✓ PP-REG-02 | Field is mandatory (3428ms)
+    ✓ PP-REG-03 | Same phone input pattern as student phone (country + number) (596ms)
+    ✓ PP-REG-04 | Valid registration saves users.parent_phone (5392ms)
+    ✓ PP-REG-05 | Valid E.164 — accepts 7-digit minimum (4511ms)
+    ✓ PP-REG-06 | Valid E.164 — accepts 15-digit maximum (4435ms)
+    ✓ PP-REG-07 | Rejects parent phone same as student phone (4113ms)
+    ✓ PP-REG-08 | Rejects invalid format — letters (4148ms)
+    ✓ PP-REG-09 | Rejects invalid format — too few digits (<7) (3852ms)
+    ✓ PP-REG-10 | Rejects invalid format — too many digits (>15) (4315ms)
+    ✓ PP-REG-11 | Validation errors shown clearly on form (4479ms)
+    ✓ PP-REG-12 | EN label — Parent Phone (2314ms)
+    ✓ PP-REG-13 | AR label (2650ms)
+    ✓ PP-REG-14 | EN validation message on invalid submit (6637ms)
+    ✓ PP-REG-15 | AR validation message on invalid submit (7782ms)
+
+  AC — Social login completion
+    ✓ PP-SOC-01 | Parent phone field shown on social completion form (520ms)
+    ✓ PP-SOC-02 | Field is mandatory on social completion (2974ms)
+    ✓ PP-SOC-03 | Valid parent phone — completion succeeds (4063ms)
+    ✓ PP-SOC-04 | Value persisted to users.parent_phone (4092ms)
+    ✓ PP-SOC-05 | Same validation — cannot match student phone (4117ms)
+    ✓ PP-SOC-06 | EN / AR translations on completion form (4819ms)
+
+  AC — Student profile settings
+    ✓ PP-PRO-01 | Parent phone visible and editable for students (6096ms)
+    ✓ PP-PRO-02 | Existing value pre-filled when opening settings (2343ms)
+    ✓ PP-PRO-03 | Mandatory when saving profile — empty rejected (2456ms)
+    ✓ PP-PRO-04 | Same validation — invalid format rejected (3853ms)
+    ✓ PP-PRO-05 | Same validation — cannot match student phone (3614ms)
+    ✓ PP-PRO-06 | Edit with valid number — saved successfully (4333ms)
+    ✓ PP-PRO-07 | Form repopulates after validation error (3653ms)
+    ✓ PP-PRO-08 | Refresh after save — updated value persists (4637ms)
+
+  AC — Instructor profile (out of scope)
+    ✓ PP-INS-01 | Parent phone hidden on instructor settings (2191ms)
+    ✓ PP-INS-02 | Instructor can save profile without parent phone validation (3741ms)
+
+  AC — Data persistence
+    ✓ PP-DATA-01 | Registration writes parent_phone (profile shows saved value) (4649ms)
+    ✓ PP-DATA-02 | Profile update replaces parent_phone (4848ms)
+    ✓ PP-DATA-03 | Failed validation does not change stored value (7609ms)
+    ✓ PP-DATA-04 | Existing user without parent phone can add one via settings (3458ms)
+
+  Validation & edge cases
+    ✓ PP-VAL-01 | Special characters rejected (3942ms)
+    ✓ PP-VAL-02 | SQL injection safely rejected (3971ms)
+    ✓ PP-VAL-03 | XSS payload rejected (4074ms)
+    ✓ PP-UX-01 | Responsive — mobile viewport (493ms)
+    ✓ PP-UX-02 | Required indicator on label (537ms)
+    ✓ PP-UX-03 | Double submit — at most two register POSTs (4175ms)
+
+
+  41 passing (3m)
+
+
+  (Results)
+
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ Tests:        41                                                                               │
+  │ Passing:      41                                                                               │
+  │ Failing:      0                                                                                │
+  │ Pending:      0                                                                                │
+  │ Skipped:      0                                                                                │
+  │ Screenshots:  0                                                                                │
+  │ Video:        false                                                                            │
+  │ Duration:     2 minutes, 39 seconds                                                            │
+  │ Spec Ran:     parent_phone.cy.js                                                               │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+======================================================================================
+
+  (Run Finished)
+
+
+       Spec                                              Tests  Passing  Failing  Pending  Skipped  
+  ┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │ ✔  parent_phone.cy.js                       02:39       41       41        -        -        - │
+  └────────────────────────────────────────────────────────────────────────────────────────────────┘
+    ✔  All specs passed!                        02:39       41       41        -        -        -  
+

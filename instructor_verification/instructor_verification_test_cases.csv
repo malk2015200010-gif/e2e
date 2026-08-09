@@ -1,0 +1,12 @@
+Test ID,Type,Title,Preconditions,Steps,Expected Result
+MEN-231-01,Positive,Register new instructor (no email verification),None,Register as instructor; land on dashboard,Account created and dashboard accessible without email verify
+MEN-231-02,Positive,Open Settings → Verification upload page,New instructor logged in,Open /dashboard/settings/verification,Identity upload page with #id_document and #upload-btn
+MEN-231-03,Positive,Upload national ID card image,New instructor logged in,Open identity page; upload valid image; submit,Success/pending confirmation shown
+MEN-231-04,Positive,ID status pending admin review,ID submitted,Re-open identity page,Status shows pending/under review
+MEN-231-05,Negative,Cannot publish while ID pending,Instructor uploaded ID; admin not approved yet,Create draft course; open publish tab,Publish still blocked
+MEN-231-06,Positive,Admin approves ID in verifications queue,Pending request in /admin/verifications,Admin opens queue; finds instructor; clicks Approve,Request approved
+MEN-231-07,Positive,Can publish after admin approval,ID approved by admin,Open publish tab; click Submit for review,Submit for review succeeds
+MEN-231-08,Negative,Submit without file — validation,New instructor on identity page,Submit empty form,Validation error shown
+MEN-231-09,Negative,Invalid file type rejected,New instructor on identity page,Upload .txt file; submit,File type error shown
+MEN-231-10,Negative,Guest blocked from identity routes,No session,GET identity routes as guest,Redirect to login or 403
+MEN-231-11,Negative,Student blocked from identity upload,Logged-in student,GET identity routes as student,403/redirect or no upload UI

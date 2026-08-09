@@ -1,71 +1,43 @@
-import { visitWithAuth } from '../../support/navigation'
-import { STUDENTS } from '../../support/users'
+/**
+ * TC-NEW-001: Prevent creating a second payment while another payment is pending.
+ *
+ * Live behavior (probed): submitting offline checkout again for a course that
+ * already has a pending offline payment redirects back to /checkout with:
+ *   "You already have a pending payment for … Please wait …"
+ */
 
-const TEST_STUDENT = STUDENTS.find(s => s.email === 'malk2015200010q@gmail.com')
+import {
+  loginAs,
+  openCheckoutWithCart,
+  submitOfflineCheckout,
+  PENDING_STUDENT,
+  PENDING_MSG_RE,
+} from './new_tests_support.js'
 
 describe('TC-NEW-001: Prevent Duplicate Payment When Pending Payment Exists', () => {
-
   beforeEach(() => {
-
-    visitWithAuth('login')
-
-    cy.get('input[type="email"]:visible')
-      .type(TEST_STUDENT.email)
-
-    cy.get('#password')
-      .type(TEST_STUDENT.password)
-
-    cy.get('button.btn-primary')
-      .click()
-
-    cy.url().should('include', '/dashboard')
+    loginAs(PENDING_STUDENT)
   })
 
   it('Should prevent creating a second payment while another payment is pending', () => {
+    openCheckoutWithCart()
+    submitOfflineCheckout()
 
-    // Add course
-    visitWithAuth('courses')
+    // First submit may create a pending purchase OR immediately show the block
+    // if one already exists for that course. Either way, a second attempt must
+    // surface the pending-payment warning.
+    cy.get('body', { timeout: 20000 }).then(($body) => {
+      if (PENDING_MSG_RE.test($body.text())) {
+        cy.contains(PENDING_MSG_RE).should('be.visible')
+        cy.contains(/please wait/i).should('be.visible')
+        return
+      }
 
-    cy.get('.add-to-cart-btn')
-      .first()
-      .should('be.visible')
-      .click()
-
-    cy.get('.badge.badge-pill')
-      .should('contain.text', '1')
-
-    // Go to checkout
-    visitWithAuth('checkout')
-
-    cy.url().should('include', '/checkout')
-
-    const clickEnrollBtn = () => {
-      cy.get('button').filter(':visible').then(($btns) => {
-        const btn = $btns.filter((_, el) =>
-          /enroll|buy|checkout|pay|purchase|complete/i.test(el.innerText)
-        )
-        if (btn.length > 0) cy.wrap(btn.first()).click()
-        else cy.log('No enroll button found on this visit')
-      })
-    }
-
-    // First payment attempt
-    clickEnrollBtn()
-
-    // Go back to checkout
-    visitWithAuth('checkout')
-    cy.url().should('include', '/checkout')
-
-    // Second payment attempt
-    clickEnrollBtn()
-
-    // Verify pending payment warning message
-    cy.contains('You already have a pending payment')
-      .should('be.visible')
-
-    cy.contains('Please wait')
-      .should('be.visible')
-
+      // First attempt succeeded → try again for the same course
+      openCheckoutWithCart()
+      submitOfflineCheckout()
+      cy.contains(PENDING_MSG_RE, { timeout: 20000 }).should('be.visible')
+      cy.contains(/please wait/i).should('be.visible')
+    })
   })
-
 })

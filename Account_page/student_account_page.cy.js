@@ -1,30 +1,24 @@
-import { visitWithAuth } from '../../support/navigation'
-import { STUDENT } from '../../support/users'
+import { loginViaApi } from '../../support/navigation'
+import { STUDENT, HTTP_AUTH } from '../../support/users'
+
+const BASE = 'https://dev.mentoraeg.com'
 
 describe('Student Account Page Navigation', () => {
 
   beforeEach(() => {
 
-    // Clear old session
-    cy.clearCookies()
-    cy.clearLocalStorage()
+    // Login via cy.request() — the form-click login redirects students to
+    // the homepage ("/") instead of "/dashboard" on this staging environment,
+    // so we log in via API (proper Laravel session) and then visit /dashboard directly.
+    loginViaApi(STUDENT)
 
-    // Login
-    visitWithAuth('login')
-
-    cy.get('input[type="email"]:visible')
-      .clear()
-      .type(STUDENT.email)
-
-    cy.get('#password')
-      .clear()
-      .type(STUDENT.password)
-
-    cy.get('button.btn.btn-primary')
-      .click({ force: true })
+    cy.visit(`${BASE}/dashboard`, {
+      auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
+      failOnStatusCode: false,
+    })
 
     // Dashboard loaded
-    cy.url().should('include', '/dashboard')
+    cy.url({ timeout: 20000 }).should('include', '/dashboard')
 
   })
 

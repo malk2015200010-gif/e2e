@@ -1,0 +1,16 @@
+Test ID,Type,Title,Preconditions,Steps,Expected Result
+MEN-2290,Positive,Instructor can create a Recorded course,Logged-in instructor,Open create course; select Recorded; save,Course created; delivery_type=recorded
+MEN-2291,Positive,Instructor can create a Live course,Logged-in instructor,Open create course; select Live; save,Course created; delivery_type=live
+MEN-2292,Negative,Hybrid option not available on create/edit,Logged-in instructor,Open create + edit course delivery select,Only Recorded and Live options; no Hybrid
+MEN-2293,Positive,Existing Hybrid courses migrated to Live,Migration applied; Assistant test was Hybrid,Open /courses/assistant-test + catalog card,Shows Live (not Hybrid); Live Course details
+MEN-2294,Positive,Catalog filter only Recorded and Live,Public catalog,Open /courses delivery filter,Only Recorded + Live checkboxes (EN)
+MEN-2295,Positive,Course cards never show Hybrid,Public catalog,Inspect course cards / meta pills,Live or Recorded only; no Hybrid
+MEN-2296,Positive,Live session links to Live course,Instructor + Live course,Open /dashboard/live-sessions/create,Helper copy is live-only; no Hybrid; live courses linkable
+MEN-2297,Positive,PPS still available for Live (migrated) courses,Live course,Open course pricing tab,Pay Per Session option present for live course
+MEN-2298,Positive,EN and AR UI no longer mention Hybrid,Instructor session,Browse create/edit/catalog/live-sessions in EN then AR,No Hybrid / هجين copy on those pages
+MEN-2299,Negative,API rejects Hybrid delivery_type,Logged-in instructor,POST /dashboard/courses/new with delivery_type=hybrid,Validation: selected delivery type is invalid; course not created
+MEN-2300,Negative,Cannot submit Hybrid via modified request,Logged-in instructor,Force delivery_type=hybrid in request body,Same rejection as MEN-2299
+MEN-2301,Negative,Hybrid filter URL cannot be used,Public catalog,GET /courses?delivery=hybrid (and delivery_type=hybrid),No Hybrid UI filter applied; totals match unfiltered or error status
+MEN-2302,Positive,Hybrid badge not on course details,Public catalog,Open a course details page,No Hybrid badge/copy
+MEN-2303,Negative,Cannot save course with Hybrid value,Logged-in instructor,POST hybrid + confirm select has no hybrid option,Validation error; UI cannot select Hybrid
+MEN-2304,Positive,Migration updated all Hybrid courses to Live,Migration applied; Assistant test is reference former-Hybrid,Assert Assistant test is Live; sweep catalog overlays; my-courses has no Hybrid,All former Hybrid courses present as Live; zero Hybrid delivery labels remain
