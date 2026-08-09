@@ -1,0 +1,81 @@
+TC ID,Module,Test Case,Expected Result
+TC-001,Email Registration,Verify Parent Phone field is displayed,Parent Phone field is visible
+TC-002,Email Registration,Verify field is mandatory,Validation error displayed
+TC-003,Email Registration,Register with valid parent phone,Registration succeeds
+TC-004,Email Registration,Verify value saved in database,users.parent_phone contains entered value
+TC-005,Email Registration,Parent phone same as student phone,Validation error displayed
+TC-006,Email Registration,Invalid format without +,Validation error
+TC-007,Email Registration,Invalid format with letters,Validation error
+TC-008,Email Registration,Too few digits (<7),Validation error
+TC-009,Email Registration,Too many digits (>15),Validation error
+TC-010,Email Registration,Valid minimum length,Registration succeeds
+TC-011,Email Registration,Valid maximum length,Registration succeeds
+TC-012,Email Registration,Spaces in number,System validates according to input component rules
+TC-013,Email Registration,Country code selector works,Country code updates correctly
+TC-014,Email Registration,Copy/paste valid number,Accepted
+TC-015,Email Registration,Copy/paste invalid number,Validation error
+TC-016,Email Registration,Verify EN label,Parent Phone label shown in English
+TC-017,Email Registration,Verify AR label,Parent Phone label shown in Arabic
+TC-018,Email Registration,Verify EN validation message,English validation displayed
+TC-019,Email Registration,Verify AR validation message,Arabic validation displayed
+TC-020,Social Login Completion,Parent Phone field displayed,Field visible
+TC-021,Social Login Completion,Field mandatory,Cannot continue without value
+TC-022,Social Login Completion,Valid parent phone,Account completion succeeds
+TC-023,Social Login Completion,Value saved in DB,users.parent_phone updated
+TC-024,Social Login Completion,Same as student phone,Validation error
+TC-025,Social Login Completion,Invalid E.164,Validation error
+TC-026,Social Login Completion,EN translations,Correct English text
+TC-027,Social Login Completion,AR translations,Correct Arabic text
+TC-028,Student Profile Settings,Parent phone visible for student,Field displayed
+TC-029,Student Profile Settings,Existing value prefilled,Saved value displayed
+TC-030,Student Profile Settings,Edit with valid number,Changes saved successfully
+TC-031,Student Profile Settings,Remove value,Mandatory validation shown
+TC-032,Student Profile Settings,Invalid format,Validation error
+TC-033,Student Profile Settings,Same as student phone,Validation error
+TC-034,Student Profile Settings,Change only parent phone,Update successful
+TC-035,Student Profile Settings,Change student phone only,Parent phone remains unchanged
+TC-036,Student Profile Settings,Save without changes,Save successful
+TC-037,Student Profile Settings,Validation error repopulates value,Previously entered value remains
+TC-038,Student Profile Settings,Refresh after save,Updated value persists
+TC-039,Instructor Profile,Instructor profile,Parent Phone field hidden
+TC-040,Instructor Profile,Instructor update profile,No validation for parent phone
+TC-041,Instructor Profile,API response for instructor,Parent phone not required
+TC-042,Validation Rules,Number starts with +,Accepted or stripped to digits per UI rules
+TC-043,Validation Rules,Missing +,Digits-only accepted (country code select used)
+TC-044,Validation Rules,Only digits after +,Accepted
+TC-045,Validation Rules,Contains special characters,Rejected
+TC-046,Validation Rules,Contains alphabetic characters,Rejected
+TC-047,Validation Rules,Exactly same as student phone,Rejected
+TC-048,Validation Rules,Different country code but same local number,Accepted if full E.164 differs
+TC-049,Validation Rules,Leading/trailing spaces,Trimmed or validation shown (per implementation)
+TC-050,Validation Rules,Null value,Mandatory validation
+TC-051,Database,Registration saves parent phone,Value stored in users.parent_phone
+TC-052,Database,Profile update updates DB,Database updated
+TC-053,Database,Failed validation,Database unchanged
+TC-054,Database,Existing user without parent phone,Can save new parent phone
+TC-055,Database,Existing parent phone updated,Old value replaced
+TC-056,Localization,English label,"Parent Phone displayed"
+TC-057,Localization,Arabic label,Arabic translation displayed
+TC-058,Localization,English required validation,Correct English message
+TC-059,Localization,Arabic required validation,Correct Arabic message
+TC-060,Localization,English invalid format,Correct message
+TC-061,Localization,Arabic invalid format,Correct message
+TC-062,Localization,English duplicate phone message,Correct message
+TC-063,Localization,Arabic duplicate phone message,Correct message
+TC-064,UI/UX,Field order,Parent phone positioned correctly
+TC-065,UI/UX,Responsive desktop,UI intact
+TC-066,UI/UX,Responsive tablet,UI intact
+TC-067,UI/UX,Responsive mobile,UI intact
+TC-068,UI/UX,Error styling,Field highlighted correctly
+TC-069,UI/UX,Required indicator,Required marker visible
+TC-070,UI/UX,Tab navigation,Keyboard navigation works
+TC-071,UI/UX,Autofill behavior,Works correctly
+TC-072,UI/UX,Country dropdown searchable (if applicable),Functions correctly
+TC-073,Negative & Edge Cases,Submit multiple times quickly,One successful request only
+TC-074,Negative & Edge Cases,Very long pasted value,Validation error
+TC-075,Negative & Edge Cases,SQL injection string,Rejected safely
+TC-076,Negative & Edge Cases,XSS payload,Escaped/rejected
+TC-077,Negative & Edge Cases,Unicode characters,Validation error
+TC-078,Negative & Edge Cases,Emojis,Validation error
+TC-079,Negative & Edge Cases,Browser refresh after validation error,Form behavior as expected
+TC-080,Negative & Edge Cases,Browser back after registration,No duplicate registration
