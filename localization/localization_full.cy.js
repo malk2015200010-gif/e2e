@@ -18,19 +18,19 @@
  *  - All pages render Arabic text + RTL when locale is set to AR
  */
 
-import { visitWithAuth, loginViaApi } from '../../support/navigation'
+import { getAppBase, visitWithAuth, loginViaApi } from '../../support/navigation'
 import { HTTP_AUTH, ADMIN, ADMINS, INSTRUCTOR, STUDENT } from '../../support/users'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BASE = 'https://dev.mentoraeg.com'
+const BASE = () => getAppBase()
 const AUTH = HTTP_AUTH
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Visit a page with HTTP Basic Auth */
 function go(path) {
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 30000 })
+  cy.visit(`${BASE()}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 30000 })
   cy.get('body', { timeout: 10000 }).should('exist')
 }
 
@@ -455,7 +455,7 @@ ADMIN_PAGES.forEach(({ path, name }) => {
   it(`LOC-ADMIN-AR | Admin "${name}" page renders in Arabic (RTL layout)`, () => {
     loginViaApi(ADMIN)
     switchToArabic()
-    cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+    cy.visit(`${BASE()}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
     cy.get('body', { timeout: 15000 }).should('exist')
 
     cy.get('html').then(($html) => {
@@ -477,7 +477,7 @@ ADMIN_PAGES.forEach(({ path, name }) => {
   it(`LOC-ADMIN-EN | Admin "${name}" page renders in English (LTR layout)`, () => {
     switchToEnglish()
     loginViaApi(ADMIN)
-    cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+    cy.visit(`${BASE()}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
     cy.get('body', { timeout: 15000 }).should('exist')
 
     cy.get('html').then(($html) => {
@@ -553,7 +553,7 @@ it('LOC-NAV-04 | Student dashboard sidebar navigation is translated in Arabic', 
 it('LOC-NAV-05 | Admin panel sidebar navigation is translated in Arabic', () => {
   loginViaApi(ADMIN)
   switchToArabic()
-  cy.visit(`${BASE}/admin`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.visit(`${BASE()}/admin`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 
   cy.get('nav, aside, [class*="sidebar"], [class*="menu"], [data-admin-menu-item]').then(($sidebar) => {
@@ -614,7 +614,7 @@ it('LOC-BTN-02 | Contact Us form submit button translates to Arabic', () => {
 it('LOC-BTN-03 | Admin CMS create button label translates in Arabic panel', () => {
   loginViaApi(ADMIN)
   switchToArabic()
-  cy.visit(`${BASE}/admin/cms`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.visit(`${BASE()}/admin/cms`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 
   cy.get('body').then(($body) => {
@@ -754,7 +754,7 @@ it('LOC-NEW-02 | After registration, new user lands on Arabic page if AR was sel
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/register`,
+    url: `${BASE()}/register`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -838,7 +838,7 @@ it('LOC-DYN-02 | Homepage featured courses section translates labels (not necess
 it('LOC-DYN-03 | Admin dashboard statistics labels translate to Arabic', () => {
   loginViaApi(ADMIN)
   switchToArabic()
-  cy.visit(`${BASE}/admin`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.visit(`${BASE()}/admin`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 
   cy.get('body').then(($body) => {
@@ -880,7 +880,7 @@ it('LOC-COV-01 | All public routes are accessible in both EN and AR (no single-l
   routes.forEach((r) => {
     cy.request({
       method: 'GET',
-      url: `${BASE}${r}`,
+      url: `${BASE()}${r}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,
@@ -894,7 +894,7 @@ it('LOC-COV-01 | All public routes are accessible in both EN and AR (no single-l
   routes.forEach((r) => {
     cy.request({
       method: 'GET',
-      url: `${BASE}${r}`,
+      url: `${BASE()}${r}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,
@@ -919,7 +919,7 @@ it('LOC-COV-02 | Admin panel accessible in both languages without errors', () =>
   adminRoutes.forEach((r) => {
     cy.request({
       method: 'GET',
-      url: `${BASE}${r}`,
+      url: `${BASE()}${r}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,
@@ -934,7 +934,7 @@ it('LOC-COV-02 | Admin panel accessible in both languages without errors', () =>
   adminRoutes.forEach((r) => {
     cy.request({
       method: 'GET',
-      url: `${BASE}${r}`,
+      url: `${BASE()}${r}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,

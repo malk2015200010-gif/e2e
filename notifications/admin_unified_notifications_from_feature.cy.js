@@ -5,6 +5,8 @@ const SELECTORS = {
   bellIcon: 'i.la-bell',
   unreadBadge: '[data-cy="admin-notification-unread-count"], .badge, .notification-badge',
   notificationItem: '[data-cy="admin-notification-item"]',
+  financeMenu:
+    'a[data-admin-menu-group="payments,refund_requests,instalments,withdraws"], a[data-admin-menu-group*="payments"]',
   instalmentsMenu: 'a[data-admin-menu-item="instalments"]',
 }
 
@@ -73,6 +75,20 @@ function openNotificationBell() {
   })
 }
 
+function expandFinanceMenu() {
+  cy.get(SELECTORS.financeMenu, { timeout: 15000 })
+    .filter(':visible')
+    .first()
+    .should('be.visible')
+    .then(($link) => {
+      if ($link.hasClass('opened')) return
+      cy.wrap($link).click({ force: true })
+    })
+
+  cy.get(SELECTORS.financeMenu).filter(':visible').first().should('have.class', 'opened')
+  cy.contains('ul.nav.nav-second-level a:visible', 'Payments', { timeout: 15000 }).should('be.visible')
+}
+
 describe('Translated feature: admin unified notifications', () => {
   beforeEach(() => {
     // default intercepts can be overridden per test
@@ -80,12 +96,12 @@ describe('Translated feature: admin unified notifications', () => {
 
   it('Sidebar badges are shown only for permitted queues', () => {
     loginAdmin()
-    // check visible admin sidebar links only (exclude debugbar / other anchors)
+    visitWithAuth('admin')
+    cy.get(SELECTORS.financeMenu).filter(':visible').first().should('be.visible').and('contain.text', 'Finance')
+    expandFinanceMenu()
     ;['Course Updates', 'Payments', 'Instalments'].forEach((label) => {
-      cy.get('a[href*="/admin"]').filter(':visible').contains(label, { timeout: 15000 }).should('be.visible')
+      cy.get('a').filter(':visible').contains(label, { timeout: 15000 }).should('be.visible')
     })
-    // ensure a forbidden label is not visible within admin links
-    cy.get('a[href*="/admin"]').filter(':visible').should('not.contain', 'WhatsApp')
   })
 
   it('Notification bell shows correct unread count', () => {

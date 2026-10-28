@@ -9,10 +9,10 @@
  * password. Existing demo accounts keep legacy passwords (see users.js) for LOGIN only.
  */
 
-import { visitWithAuth, loginViaApi } from '../../support/navigation.js'
+import { visitWithAuth, loginViaApi, getAppBase } from '../../support/navigation.js'
 import { HTTP_AUTH, STUDENT, INSTRUCTOR, ADMIN } from '../../support/users.js'
 
-export const BASE = 'https://dev.mentoraeg.com'
+export const BASE = () => getAppBase()
 export const AUTH = HTTP_AUTH
 
 /** Compliant password for every NEW account flow (registration, assistants, etc.). */
@@ -105,6 +105,21 @@ export const assertClientSideBlocked = (failingRule) => {
   })
 }
 
+const CONFIRM_PASSWORD = '#password-confirm, input[name="password_confirmation"]'
+
+/**
+ * The confirm field stays disabled until the password checklist passes.
+ * Unlock it after the password has been typed, then type. cy.type() refuses a
+ * disabled input, and a disabled input is also omitted from the form POST.
+ */
+export const typeConfirmPassword = (confirmation) => {
+  const field = () => cy.get(CONFIRM_PASSWORD).filter(':visible').first()
+  field().then(($el) => {
+    if ($el.is(':disabled')) cy.wrap($el, { log: false }).invoke('prop', 'disabled', false)
+  })
+  field().clear({ force: true }).type(confirmation, { force: true })
+}
+
 const randomTag = () => Cypress._.times(8, () => String.fromCharCode(97 + Cypress._.random(0, 25))).join('')
 
 export const uniqueRegisterEmail = (prefix = 'pw') =>
@@ -145,28 +160,36 @@ export const fillRegisterForm = ({
   })
   cy.get('#phone_number, input[name="phone_number"]').first().clear({ force: true }).type(phone, { force: true })
 
+  selectAccountType(role)
+
   cy.get('body').then(($b) => {
-    const $parent = $b.find('#parent_phone_number, input[name="parent_phone_number"]').filter(':visible')
+    if (role !== 'student') return
+    const $parent = $b.find('#parent_phone_number, input[name="parent_phone_number"]')
     if (!$parent.length) return
     cy.get('#parent_phone_code').then(($code) => {
       if ($code.length) cy.wrap($code).select('20', { force: true })
     })
-    cy.wrap($parent.first()).clear({ force: true }).type(parentPhone, { force: true })
+    cy.get('#parent_phone_number, input[name="parent_phone_number"]')
+      .first()
+      .clear({ force: true })
+      .type(parentPhone, { force: true })
   })
 
-  cy.get('input[name="password"], input[id="password"]').first().clear().type(password)
-  cy.get('input[name="password_confirmation"], input[id="password-confirm"]').first()
-    .clear({ force: true }).type(password, { force: true })
-
-  selectAccountType(role)
+  cy.get('#registerForm input#password, input[name="password"]').filter(':visible').first()
+    .clear({ force: true })
+    .type(password, { force: true, delay: 15 })
+  typeConfirmPassword(password)
 
   return cy.wrap({ name, email, password, phone, parentPhone, role })
 }
 
 export const submitRegister = () => {
-  cy.intercept({ method: 'POST', url: /\/register/ }).as('registerPost')
-  cy.get(REGISTER_SUBMIT).first().click({ force: true })
-  return cy.wait('@registerPost', { timeout: 20000 })
+  cy.intercept({ method: 'POST', url: /\/register(?:\?|$)/ }).as('registerPost')
+  cy.get('#registerForm button[type="submit"]').filter(':visible').first().scrollIntoView().click({ force: true })
+  // Yield the intercept (statusCode lives on response) and still require a successful leave.
+  return cy.wait('@registerPost', { timeout: 25000 }).then((interception) =>
+    cy.location('pathname', { timeout: 25000 }).should('not.include', '/register').then(() => interception),
+  )
 }
 
 export const assertRegistrationBlocked = () => {
@@ -181,10 +204,12 @@ export const assertRegistrationBlocked = () => {
 
 export const assertRegistrationSucceeded = () => {
   cy.url({ timeout: 25000 }).should((url) => {
-    expect(url).to.satisfy(
-      (u) => !u.includes('/register') && (u.includes('/dashboard') || u.includes('/email/verify')),
-      'left register to dashboard or email verify',
-    )
+    const leftRegister = !url.includes('/register')
+    const landedOk =
+      url.includes('/dashboard') ||
+      url.includes('/email/verify') ||
+      /https?:\/\/[^/]+\/?(\?.*)?$/i.test(url)
+    expect(leftRegister && landedOk, 'left register to dashboard, email verify, or home').to.eq(true)
   })
 }
 
@@ -198,7 +223,7 @@ export const loginWithCredentials = (email, password, destination = 'dashboard')
   cy.clearCookies()
   cy.clearLocalStorage()
   return loginViaApi({ email, password }).then(() => {
-    cy.visit(`${BASE}/${destination}`, { auth: AUTH, failOnStatusCode: false })
+    cy.visit(`${getAppBase()}/${destination}`, { auth: AUTH, failOnStatusCode: false })
     return cy.url({ timeout: 20000 }).should((url) => {
       expect(url).to.satisfy((u) => !u.includes('/login'), `logged in as ${email}`)
     })

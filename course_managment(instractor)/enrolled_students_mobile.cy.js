@@ -6,8 +6,8 @@
 // MEN-1318 | Language switch on mobile
 // MEN-1319 | Large student list on mobile
 
-import { visitWithAuth } from '../../support/navigation'
-import { HTTP_AUTH, ADMIN, INSTRUCTOR } from '../../support/users'
+import { loginViaApi } from '../../support/navigation'
+import { HTTP_AUTH, INSTRUCTOR, basicAuth } from '../../support/users'
 
 const MOBILE_VIEWPORTS = [
   { name: 'iPhone X',   width: 375, height: 812  },
@@ -16,13 +16,15 @@ const MOBILE_VIEWPORTS = [
 ]
 
 function loginInstructor() {
-  cy.clearCookies()
-  cy.clearLocalStorage()
-  visitWithAuth('login')
-  cy.get('input[type="email"]:visible', { timeout: 10000 }).clear().type(INSTRUCTOR.email)
-  cy.get('#password', { timeout: 10000 }).clear().type(INSTRUCTOR.password)
-  cy.get('button.btn.btn-primary').click({ force: true })
-  cy.url({ timeout: 30000 }).should('include', '/dashboard')
+  loginViaApi(INSTRUCTOR)
+  cy.visit('/dashboard', {
+    auth: basicAuth(),
+    failOnStatusCode: false,
+    timeout: 120000,
+  })
+  cy.url({ timeout: 30000 }).should((url) => {
+    expect(url, 'instructor logged in').to.satisfy((u) => !u.includes('/login'))
+  })
 }
 
 function goToMyCourses() {
@@ -166,7 +168,7 @@ it('MEN-1318 | Language switch works correctly on mobile roster page', () => {
       cy.get('body').should('not.contain.text', 'Error 500')
       cy.log('Language switch triggered on mobile — page still renders correctly')
     } else {
-      cy.visit('https://dev.mentoraeg.com/dashboard/my-courses?lang=ar', {
+      cy.visit('/dashboard/my-courses?lang=ar', {
         auth: HTTP_AUTH,
         failOnStatusCode: false,
         timeout: 60000,

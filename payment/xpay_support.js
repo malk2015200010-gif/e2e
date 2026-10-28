@@ -5,7 +5,7 @@ import './soft_mode.js'
  *
  * Mentora-side flows are the default for CI / "run all specs".
  * Full hosted-card E2E on checkout.xpay.app only runs when
- * Cypress.env('XPAY_FULL_E2E') is set.
+ * Cypress.expose('XPAY_FULL_E2E') is set.
  *
  * Test cards (XPay test mode only — used by optional full E2E):
  *   NBE Mastercard EGP  — 5123 4500 0000 0008
@@ -16,18 +16,18 @@ import './soft_mode.js'
  * CVV: 100 MATCH
  */
 
-import { loginViaApi } from '../../support/navigation.js'
-import { HTTP_AUTH, STUDENTS } from '../../support/users.js'
+import { getAppBase, loginAndVisit } from '../../support/navigation.js'
+import { HTTP_AUTH, basicAuth, STUDENTS } from '../../support/users.js'
 
-export const BASE = 'https://dev.mentoraeg.com'
+export const BASE = () => getAppBase()
 export const AUTH = HTTP_AUTH
 
 /** Student without pending offline payments (probed on live). */
 export const XPAY_CHECKOUT_STUDENT =
   STUDENTS.find(
-    (s) => s.email === (Cypress.env('XPAY_STUDENT_EMAIL') || 'malk2015200010j@gmail.com'),
+    (s) => s.email === (Cypress.expose('XPAY_STUDENT_EMAIL') || 'malk2015200010j@gmail.com'),
   ) ||
-  STUDENTS.find((s) => s.email === 'malk2015200010b@gmail.com') ||
+  STUDENTS.find((s) => s.email === 'malk2015200010d@gmail.com') ||
   STUDENTS[0]
 
 /** Student that already has pending offline payments — for offline/pending assertions. */
@@ -37,7 +37,7 @@ export const OFFLINE_PENDING_STUDENT =
   XPAY_CHECKOUT_STUDENT
 
 /** Paid non-PPS-style course that yields amount > 0 without session picks (probed). */
-export const PREFERRED_COURSE_ID = String(Cypress.env('XPAY_COURSE_ID') || '423')
+export const PREFERRED_COURSE_ID = String(Cypress.expose('XPAY_COURSE_ID') || '423')
 
 export const XPAY_ORIGIN = 'https://checkout.xpay.app'
 export const XPAY_REDIRECT_RE = /checkout\.xpay\.app|xpaycheckout\.com/i
@@ -45,28 +45,30 @@ export const XPAY_REDIRECT_RE = /checkout\.xpay\.app|xpaycheckout\.com/i
 export const PENDING_MSG_RE =
   /already have a pending payment|pending payment|please wait/i
 
+const EMPTY_CART_COPY_RE =
+  /there is nothing to checkout|your cart is empty\.?|cart is empty\.?|السلة فارغة|سلة\s*فارغ/i
+
+const VISIT_TIMEOUT = 120000
+
 /** Suppress cookie-consent bar so it cannot intercept cart/checkout clicks. */
 const suppressCookieConsentBar = () => {
-  cy.setCookie('mentora_analytics_consent', 'granted', { domain: 'dev.mentoraeg.com' })
+  cy.setCookie('mentora_analytics_consent', 'granted', { domain: new URL(BASE()).hostname })
 }
 
 export const go = (path, opts = {}) => {
   suppressCookieConsentBar()
-  return cy.visit(`${BASE}${path.startsWith('/') ? path : `/${path}`}`, {
-    auth: AUTH,
+  const target = path.startsWith('/') ? path : `/${path}`
+  return cy.visit(`${BASE()}${target}`, {
+    auth: basicAuth(),
     failOnStatusCode: false,
-    timeout: 60000,
+    timeout: VISIT_TIMEOUT,
+    retryOnNetworkFailure: true,
     ...opts,
   })
 }
 
 export const loginCheckoutStudent = (user = XPAY_CHECKOUT_STUDENT) =>
-  loginViaApi(user).then(() => {
-    go('/dashboard')
-    return cy.url({ timeout: 20000 }).should((url) => {
-      expect(url).to.satisfy((u) => !u.includes('/login'), `logged in as ${user.email}`)
-    })
-  })
+  loginAndVisit(user, '/dashboard')
 
 export const XPAY_CARDS = {
   nbeMastercardEGP: { number: '5123450000000008', label: '5123 4500 0000 0008', currency: 'EGP' },
@@ -99,21 +101,48 @@ export const XPAY_CVV = {
 export const isXPayReactHydrationError = (message = '') =>
   /Minified React error #418|react\.dev\/errors\/418|Hydration failed/i.test(message)
 
+/**
+ * Cart occupancy for checkout. Do not scan full $body.text() — Debugbar / GA /
+ * Arabic "سلة" in the nav can false-empty a full cart (or hide a real empty state).
+ * Positive signals: amount, XPay/offline forms. Empty = visible empty-state copy.
+ */
+const checkoutSurfaceText = ($body) => {
+  const clone = $body.clone()
+  clone
+    .find(
+      '#phpdebugbar, .phpdebugbar, [id*="phpdebugbar"], [class*="phpdebugbar"], script, style, noscript, iframe',
+    )
+    .remove()
+  const $main = clone
+    .find('main, #main, .checkout, .checkout-page, .cart-page, .page-content, #content')
+    .first()
+  return ($main.length ? $main : clone).text()
+}
+
 export const cartHasItems = ($body) => {
-  // Prefer the explicit empty-cart copy on checkout — Debugbar/other UI can
-  // contain incidental "cart"/"badge" noise that is not a real cart item.
-  if (/your cart is empty|cart is empty|سلة.*فارغ/i.test($body.text())) return false
-  if ($body.find('#selected_payment_amount').length) {
-    const amt = Number(String($body.find('#selected_payment_amount').val() || '0').replace(/,/g, ''))
-    if (amt > 0) return true
-  }
-  if ($body.find('.cart-item, [class*="cart-item"], [class*="checkout-item"], .gateway-payment-form').length) {
+  const surface = checkoutSurfaceText($body)
+  if (EMPTY_CART_COPY_RE.test(surface)) return false
+
+  const amtEl = $body.find('#selected_payment_amount, input[name="selected_payment_amount"]').first()
+  const amt = amtEl.length ? Number(String(amtEl.val() || '0').replace(/,/g, '')) : 0
+  if (Number.isFinite(amt) && amt > 0) return true
+
+  if ($body.find('.cart-item, [class*="cart-item"], [class*="checkout-item"]').length) {
     return true
   }
-  const badge = $body.find('#miniCartDropDown .badge.badge-pill, .mini-cart .badge.badge-pill').first()
-  if (!badge.length) return false
-  const n = badge.text().trim()
-  return n !== '' && n !== '0'
+
+  // Payment forms only count when checkout is clearly not the empty-state page.
+  if (
+    amtEl.length &&
+    amt > 0 &&
+    $body.find(
+      'form[action*="checkout/xpay-payment"], #xpay-payment-form-card, form[action*="checkout/offline"]',
+    ).length
+  ) {
+    return true
+  }
+
+  return false
 }
 
 export const clearCart = () => {
@@ -129,58 +158,119 @@ export const clearCart = () => {
   // Best-effort server clear
   cy.request({
     method: 'POST',
-    url: `${BASE}/remove-cart`,
-    auth: AUTH,
+    url: `${BASE()}/remove-cart`,
+    auth: basicAuth(),
     form: true,
     failOnStatusCode: false,
     body: {},
   })
 }
 
-/**
- * Add preferred paid course via the real /add-to-cart API (same endpoint the
- * UI button hits). UI clicks are flaky here: cookie bar / re-render / single
- * visible add-to-cart button often leave checkout empty even when the badge
- * assertion appeared to pass.
- */
-export const ensurePaidCourseInCart = () => {
-  go('/courses')
-  cy.get('body', { timeout: 15000 }).should('exist')
+const extractCsrf = (html) => {
+  const text = typeof html === 'string' ? html : ''
+  const tokenMatch = text.match(/name="_token"\s+value="([^"]+)"/) || text.match(/<meta name="csrf-token" content="([^"]+)"/)
+  return tokenMatch ? tokenMatch[1] : ''
+}
 
-  cy.get('body').then(($body) => {
-    if (cartHasItems($body)) {
-      cy.log('Cart already has items')
-      return
+const extractCourseIds = (html) => {
+  const ids = []
+  const re = /data-course-id=["'](\d+)["']/g
+  let m
+  const text = typeof html === 'string' ? html : ''
+  while ((m = re.exec(text))) {
+    if (!ids.includes(m[1])) ids.push(m[1])
+  }
+  return ids
+}
+
+const addSucceeded = (res) => {
+  if (![200, 302].includes(res.status)) return false
+  let body = res.body
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body)
+    } catch {
+      return true
     }
+  }
+  if (body && typeof body === 'object' && 'success' in body) {
+    return body.success === 1 || body.success === true
+  }
+  return true
+}
 
-    const token =
-      ($body.find('input[name="_token"]').val() ||
-        $body.find('meta[name="csrf-token"]').attr('content') ||
-        '') + ''
-
-    cy.request({
-      method: 'POST',
-      url: `${BASE}/add-to-cart`,
-      auth: AUTH,
-      form: true,
-      failOnStatusCode: false,
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        Accept: 'application/json',
-      },
-      body: {
-        _token: token,
-        course_id: PREFERRED_COURSE_ID,
-      },
-    }).then((res) => {
-      expect(res.status, 'add-to-cart status').to.be.oneOf([200, 302])
-      if (res.body && typeof res.body === 'object') {
-        expect(res.body.success, 'add-to-cart success').to.eq(1)
-      }
-    })
+const postAddToCart = (token, courseId) =>
+  cy.request({
+    method: 'POST',
+    url: `${BASE()}/add-to-cart`,
+    auth: basicAuth(),
+    form: true,
+    failOnStatusCode: false,
+    timeout: VISIT_TIMEOUT,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json',
+    },
+    body: {
+      _token: token,
+      course_id: String(courseId),
+    },
   })
 
-  // Confirm on checkout itself (source of truth), not a nav badge alone.
+/**
+ * Always POST a known paid course via /add-to-cart in the current Cypress
+ * session (cart is cookie-jar scoped). CSRF comes from GET /courses in the
+ * same jar — do not use cy.task('httpGet').
+ */
+export const addPaidCourseToCart = (courseId) => {
+  const preferred = String(courseId || Cypress.expose('XPAY_COURSE_ID') || PREFERRED_COURSE_ID || '423')
+
+  return cy
+    .request({
+      method: 'GET',
+      url: `${BASE()}/courses`,
+      auth: basicAuth(),
+      failOnStatusCode: false,
+      timeout: VISIT_TIMEOUT,
+    })
+    .then((getRes) => {
+      const html = typeof getRes.body === 'string' ? getRes.body : ''
+      const token = extractCsrf(html)
+      expect(token, 'CSRF token from GET /courses').to.have.length.greaterThan(10)
+
+      const discovered = extractCourseIds(html)
+      const candidates = [preferred, ...discovered.filter((id) => id !== preferred)]
+
+      const attempt = (ids) => {
+        const id = ids[0]
+        if (!id) {
+          throw new Error(
+            `add-to-cart failed for preferred course ${preferred} and no fallback data-course-id succeeded`,
+          )
+        }
+        return postAddToCart(token, id).then((res) => {
+          if (addSucceeded(res)) {
+            Cypress.log({ name: 'add-to-cart', message: `success for course ${id}` })
+            return { courseId: id }
+          }
+          Cypress.log({
+            name: 'add-to-cart',
+            message: `failed for course ${id} (HTTP ${res.status}) — trying next`,
+          })
+          return attempt(ids.slice(1))
+        })
+      }
+
+      return attempt(candidates)
+    })
+}
+
+/**
+ * Always POST a paid course after login, then open /checkout and assert items.
+ * Do not skip the POST based on a listing-page cart badge.
+ */
+export const ensurePaidCourseInCart = () => {
+  addPaidCourseToCart()
   go('/checkout')
   cy.url({ timeout: 20000 }).should('include', '/checkout')
   cy.get('body', { timeout: 15000 }).should(($body) => {
@@ -216,15 +306,10 @@ export const selectSessionsIfNeeded = () => {
 
 export const openMentoraCheckout = function () {
   ensurePaidCourseInCart()
-  go('/checkout')
   cy.url({ timeout: 20000 }).should('include', '/checkout')
 
   cy.get('body', { timeout: 15000 }).then(function ($body) {
-    if (!cartHasItems($body)) {
-      cy.log('SKIP: checkout cart is empty — set CYPRESS_XPAY_COURSE_ID to a paid course')
-      this.skip()
-    }
-    if (PENDING_MSG_RE.test($body.text())) {
+    if (PENDING_MSG_RE.test(checkoutSurfaceText($body))) {
       cy.log('SKIP: student has pending payment on checkout — use a clean account')
       this.skip()
     }
@@ -279,8 +364,21 @@ export const clickXPayPayButton = () => {
   selectXPayPaymentMethod()
   syncGatewayAmountFromCheckout()
 
+  cy.get('body').then(($body) => {
+    if ($body.find('#xpay-payment-form-card button[type="submit"]:visible').length) return
+    const tab = $body
+      .find('a, button, [data-toggle="tab"]')
+      .filter((_, el) => /pay with card|card|xpay|بطاقة/i.test(el.textContent || ''))
+      .filter(':visible')
+      .first()
+    if (tab.length) cy.wrap(tab).click({ force: true })
+  })
+
   // Terminal click only — submit navigates away; never chain after this.
-  cy.get('#xpay-payment-form-card button[type="submit"]:visible', { timeout: 15000 })
+  cy.get(
+    '#xpay-payment-form-card button[type="submit"]:visible, form[action*="checkout/xpay-payment"] button[type="submit"]:visible',
+    { timeout: 20000 },
+  )
     .first()
     .click({ force: true })
 }

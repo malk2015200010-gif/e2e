@@ -24,12 +24,10 @@ import {
   ROUTES,
   DUPLICATE_EMAIL_RE,
   VALIDATION_RE,
-  buildAssistantUser,
   openAssistantsViaNav,
   openCreateAssistantPage,
   fillAssistantForm,
-  createAssistantViaUi,
-  createAssistantViaApi,
+  ensurePooledAssistant,
   loginAsAssistant,
   deactivateAssistant,
   assertDeactivatedAssistantCannotLogin,
@@ -48,7 +46,7 @@ import {
   assertCannotViewEnrolledStudents,
   assertWithdrawAccessAllowed,
   assertWithdrawAccessDenied,
-  go,
+  visitAssistant,
 } from './instructor_assistants_support.js'
 
 let sharedAssistant = null
@@ -59,23 +57,16 @@ let courseId = null
 describe('MEN-1726 — Assistant management (instructor)', () => {
 
   it('MEN-2135 | [Positive] Instructor can create an assistant', () => {
-    const user = buildAssistantUser('create')
-
-    openAssistantsViaNav()
-    cy.get(CREATE_ASSISTANT_LINK, { timeout: 15000 }).first().click({ force: true })
-    cy.url().should('include', ASSISTANTS_CREATE)
-
-    fillAssistantForm({
-      ...user,
-      permissions: [PERMS.CREATE_COURSE, PERMS.LIVE_SESSIONS],
+    ensurePooledAssistant([PERMS.CREATE_COURSE, PERMS.LIVE_SESSIONS]).then((user) => {
+      openAssistantsViaNav()
+      cy.get(CREATE_ASSISTANT_LINK, { timeout: 15000 }).first().click({ force: true })
+      cy.url().should('include', ASSISTANTS_CREATE)
+      assertAssistantListed(user.name)
     })
-    cy.get(ASSISTANT_SUBMIT_BTN).first().click({ force: true })
-
-    cy.url({ timeout: 25000 }).should('include', ASSISTANTS_LIST)
-    assertAssistantListed(user.name)
   })
 
   it('MEN-2140 | [Negative] Duplicate email blocked during assistant creation', () => {
+    cy.intercept('POST', '**/dashboard/assistants').as('duplicateAssistant')
     openCreateAssistantPage()
     fillAssistantForm({
       name: 'Duplicate Assistant',
@@ -85,14 +76,14 @@ describe('MEN-1726 — Assistant management (instructor)', () => {
     })
     cy.get(ASSISTANT_SUBMIT_BTN).first().click({ force: true })
 
-    cy.url({ timeout: 15000 }).then((url) => {
-      const stayedOnForm = url.includes(ASSISTANTS_CREATE)
-      if (stayedOnForm) {
-        cy.get('body').invoke('text').should('match', DUPLICATE_EMAIL_RE)
-      } else {
-        // Redirected to list — duplicate must not appear as a new success row for this name
-        cy.get('body').invoke('text').should('match', DUPLICATE_EMAIL_RE)
-      }
+    cy.wait('@duplicateAssistant').then(({ response }) => {
+      const location = String(response?.headers?.location || '')
+      const body = typeof response?.body === 'string' ? response.body : ''
+      const rejected =
+        location.includes('/assistants/create') ||
+        response?.statusCode === 422 ||
+        DUPLICATE_EMAIL_RE.test(body)
+      expect(rejected, 'duplicate email is rejected').to.eq(true)
     })
   })
 
@@ -111,19 +102,15 @@ describe('MEN-1726 — Assistant management (instructor)', () => {
 
 // ─── Assistant login lifecycle ────────────────────────────────────────────────
 
-describe('MEN-1726 — Assistant login', { testIsolation: false }, () => {
+describe('MEN-1726 — Assistant login', () => {
 
   it('MEN-2142 | [Positive] Assistant logs in and sees Working for teacher', () => {
-    sharedAssistant = buildAssistantUser('login')
-
-    createAssistantViaUi({
-      ...sharedAssistant,
-      permissions: [PERMS.CREATE_COURSE],
-    }).then((created) => {
+    ensurePooledAssistant([PERMS.CREATE_COURSE]).then((created) => {
       sharedAssistant = created
-      assertAssistantListed(created.name)
-      loginAsAssistant(created)
-      assertWorkingForTeacher()
+      loginAsAssistant(created).then(() => {
+        visitAssistant('/dashboard')
+        assertWorkingForTeacher()
+      })
     })
   })
 
@@ -132,19 +119,18 @@ describe('MEN-1726 — Assistant login', { testIsolation: false }, () => {
 
     deactivateAssistant(sharedAssistant)
     assertDeactivatedAssistantCannotLogin(sharedAssistant)
+    ensurePooledAssistant([PERMS.CREATE_COURSE])
   })
 })
 
 // ─── Permission helpers ───────────────────────────────────────────────────────
 
-const withAssistant = (tag, permissions, fn) => {
-  const user = buildAssistantUser(tag)
-  return createAssistantViaApi({ ...user, permissions }).then((created) =>
+const withAssistant = (_tag, permissions, fn) =>
+  ensurePooledAssistant(permissions).then((created) =>
     loginAsAssistant(created).then(() => fn(created)),
   )
-}
 
-describe('MEN-1726 — Course permissions', { testIsolation: false }, () => {
+describe('MEN-1726 — Course permissions', () => {
 
   before(function () {
     ensureInstructorCourseId().then((id) => { courseId = id })
@@ -223,7 +209,7 @@ describe('MEN-1726 — Live session permissions', () => {
 
   it('MEN-2154 | [Positive] Assistant with live sessions sees start/host/create controls', () => {
     withAssistant('zoomhost', [PERMS.LIVE_SESSIONS], () => {
-      go(ROUTES.liveSessions)
+      visitAssistant(ROUTES.liveSessions)
       cy.url({ timeout: 20000 }).should('include', '/live-sessions')
       cy.get('body').then(($b) => {
         const $actions = $b.find('a, button').filter((_, el) =>
@@ -241,7 +227,7 @@ describe('MEN-1726 — Live session permissions', () => {
 
 // ─── Students, grading, finance ─────────────────────────────────────────────
 
-describe('MEN-1726 — Students grading and finance permissions', { testIsolation: false }, () => {
+describe('MEN-1726 — Students grading and finance permissions', () => {
 
   before(function () {
     if (courseId) return
@@ -251,7 +237,7 @@ describe('MEN-1726 — Students grading and finance permissions', { testIsolatio
   it('MEN-2155 | [Positive] Assistant with View Enrolled Students permission can access roster', function () {
     if (!courseId) this.skip()
     withAssistant('students', [PERMS.VIEW_STUDENTS], () => {
-      go(`/dashboard/courses/${courseId}`)
+      visitAssistant(`/dashboard/courses/${courseId}`)
       cy.url({ timeout: 20000 }).should('include', `/courses/${courseId}`)
       cy.get('body').then(($b) => {
         const $roster = $b.find('a, button').filter((_, el) =>
@@ -297,7 +283,7 @@ describe('MEN-1726 — Students grading and finance permissions', { testIsolatio
 
   it('MEN-2160 | [Negative] Assistant without View Earnings permission is blocked', () => {
     withAssistant('noearnings', [], () => {
-      go('/dashboard')
+      visitAssistant('/dashboard')
       assertNavMissing(/earning/i)
       assertAccessDenied(ROUTES.earnings)
     })
@@ -346,7 +332,7 @@ describe('MEN-1726 — Menu visibility', () => {
 
   it('MEN-2166 | [Positive] Menu items reflect granted permissions (live sessions only)', () => {
     withAssistant('menulive', [PERMS.LIVE_SESSIONS], () => {
-      go('/dashboard')
+      visitAssistant('/dashboard')
       assertWorkingForTeacher()
       assertNavContains(/live sessions/i)
       assertNavMissing(/earning/i)

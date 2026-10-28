@@ -1,152 +1,154 @@
-import { loginViaApi } from '../../support/navigation'
+import { getAppBase, loginAndVisit } from '../../support/navigation'
 import { ADMIN, HTTP_AUTH } from '../../support/users'
 
-const BASE = 'https://dev.mentoraeg.com'
+const BASE = () => getAppBase()
 
+// Cypress .click() loses the page on these menu links: the address becomes "/"
+// and the next assertion never sees /admin/courses. Open the link's own path.
+const openMenuLink = (anchor) => {
+  const href = anchor.getAttribute('href') || ''
+  let path = ''
+  try {
+    path = new URL(href, BASE()).pathname
+  } catch (_) {}
+  if (path && path !== '/' && !href.trim().startsWith('#')) {
+    cy.visit(path, {
+      auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
+      failOnStatusCode: false,
+      timeout: 120000,
+    })
+    return
+  }
+  anchor.click()
+}
+
+const clickAnchor = (selector) => {
+  cy.get(selector, { timeout: 20000 }).first().then(($el) => {
+    openMenuLink($el[0].closest('a') || $el[0])
+  })
+}
+
+const clickAnchorNamed = (label) => {
+  cy.contains('a', label, { timeout: 20000 }).then(($el) => {
+    openMenuLink($el[0])
+  })
+}
+
+const expectPath = (part) => {
+  cy.location('pathname', { timeout: 20000 }).should('include', part)
+}
+
+describe('Admin Account Page Navigation', () => {
   beforeEach(() => {
-    loginViaApi(ADMIN)
+    // Media manager waits on dozens of file previews before the page load event.
+    cy.intercept({ resourceType: 'image' }, { statusCode: 200, body: '' })
+    loginAndVisit(ADMIN, '/admin')
   })
 
   it('Open Admin Home page', () => {
-    cy.visit(`${BASE}/admin`, {
+    cy.visit(`${BASE()}/admin`, {
       auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
-      failOnStatusCode: false, timeout: 60000,
+      failOnStatusCode: false,
+      timeout: 120000,
     })
-    cy.url({ timeout: 15000 }).then((url) => {
-      if (url.includes('/admin')) {
-        cy.contains('a', 'Admin Home', { timeout: 10000 }).should('be.visible').click({ force: true })
-        cy.url().should('include', '/admin')
-      } else {
-        cy.log(`Admin page redirected to ${url} — admin session not available`)
-      }
-    })
+    cy.url({ timeout: 20000 }).should('include', '/admin')
+    clickAnchorNamed('Admin Home')
+    expectPath('/admin')
   })
 
   it('Check all admin pages', () => {
-    cy.visit(`${BASE}/admin`, {
-      auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
-      failOnStatusCode: false, timeout: 60000,
-    })
-    cy.url({ timeout: 15000 }).then((url) => {
-      if (!url.includes('/admin')) {
-        cy.log(`Admin page redirected to ${url} — skipping admin navigation tests`)
-        return
-      }
-    })
+    expectPath('/admin')
 
-    // Admin Home
     cy.get('body').then(($body) => {
       if ($body.find('a:contains("Admin Home")').length) {
-        cy.contains('a', 'Admin Home', { timeout: 10000 }).should('be.visible').click({ force: true })
+        clickAnchorNamed('Admin Home')
       }
     })
-    cy.url().should('include', '/admin')
+    expectPath('/admin')
 
-    // CMS → Posts
-    cy.get('i.la-newspaper-o').parent().click({ force: true })
-    cy.wait(1000)
-    cy.get('a[href*="/admin/cms"]').first().click({ force: true })
+    clickAnchor('i.la-newspaper-o')
+    clickAnchor('a[href*="/admin/cms"]')
     cy.url().then((url) => { cy.log('URL after Admin CMS click: ' + url) })
 
-    // CMS → Pages
-    cy.get('i.la-newspaper-o').parent().click({ force: true })
-    cy.wait(1000)
-    cy.get('a[href*="/admin/cms/page"]').click({ force: true })
+    clickAnchor('i.la-newspaper-o')
+    clickAnchor('a[href*="/admin/cms/page"]')
     cy.url().then((url) => { cy.log('URL after CMS Pages click: ' + url) })
 
-    // Media manager
-    cy.contains('Media manager').click({ force: true })
+    clickAnchorNamed('Media manager')
     cy.url().then((url) => { cy.log('URL after Media Manager click: ' + url) })
 
-    // Categories
-    cy.contains('Categories').click({ force: true })
-    cy.url().should('include', '/categories')
+    clickAnchor('a[href$="/admin/categories"]')
+    expectPath('/categories')
 
-    // Courses
-    cy.contains('Courses').click({ force: true })
-    cy.url().should('include', '/courses')
+    clickAnchor('a[data-admin-menu-item="courses"]')
+    cy.location('pathname', { timeout: 20000 }).should('eq', '/admin/courses')
 
-    // Course Updates
-    cy.contains('Course Updates').click({ force: true })
-    cy.url().should('include', '/courses/updates')
+    clickAnchor('a[data-admin-menu-item="course_updates"]')
+    expectPath('/courses/updates')
 
-    // Settings → General
-    cy.get('i.la-tools').parent().click({ force: true })
-    cy.wait(1000)
-    cy.contains('a', 'General Settings').click({ force: true })
-    cy.url().should('include', '/settings')
+    clickAnchor('i.la-tools')
+    clickAnchorNamed('General Settings')
+    expectPath('/settings')
 
-    // Settings → LMS
-    cy.contains('a', 'LMS Settings').click({ force: true })
-    cy.url().should('include', '/lms')
+    clickAnchorNamed('LMS Settings')
+    expectPath('/lms')
 
-    // Settings → Payment Settings
-    cy.contains('a', 'Payment Settings').click({ force: true })
-    cy.url().should('include', '/payment')
+    clickAnchorNamed('Payment Settings')
+    expectPath('/payment')
 
-    // Settings → Payment Gateways
-    cy.contains('a', 'Payment Gateways').click({ force: true })
-    cy.url().should('include', '/gateways')
+    clickAnchorNamed('Payment Gateways')
+    expectPath('/gateways')
 
-    // Settings → Withdraw
-    cy.contains('a', 'Withdraw').click({ force: true })
-    cy.url().should('include', '/withdraw')
+    clickAnchorNamed('Withdraw')
+    expectPath('/withdraw')
 
-    // Settings → Social Login
-    cy.contains('a', 'Social Login Settings').click({ force: true })
-    cy.url().should('include', '/social')
+    clickAnchorNamed('Social Login Settings')
+    expectPath('/social')
 
-    // Settings → Storage
-    cy.contains('a', 'Storage').click({ force: true })
-    cy.url().should('include', '/storage')
+    clickAnchorNamed('Storage')
+    expectPath('/storage')
 
-    // Payments
-    cy.contains('Payments').click({ force: true })
-    cy.url().should('include', '/payments')
+    clickAnchor('a[data-admin-menu-item="payments"]')
+    expectPath('/payments')
 
-    // Instalments
-    cy.contains('Instalments').click({ force: true })
-    cy.url().should('include', '/instalments')
+    clickAnchor('a[data-admin-menu-item="instalments"]')
+    expectPath('/instalments')
 
-    // Withdraws
-    cy.contains('Withdraws').click({ force: true })
-    cy.url().should('include', '/withdraws')
+    clickAnchor('a[data-admin-menu-item="withdraws"]')
+    expectPath('/withdraws')
 
-    // Users
-    cy.contains('Users').click({ force: true })
-    cy.url().should('include', '/users')
+    clickAnchorNamed('Users')
+    expectPath('/users')
 
-    // Instructor Verifications
-    cy.contains('Instructor Verifications').click({ force: true })
-    cy.url().should('include', '/verifications')
+    clickAnchor('a[data-admin-menu-item="verifications"]')
+    expectPath('/verifications')
 
-    // WhatsApp → Inbox
-    cy.contains('a', 'WhatsApp').click({ force: true })
-    cy.wait(1000)
-    cy.get('a[href*="/admin/whatsapp-crm/conversations"]').click({ force: true })
+    clickAnchorNamed('WhatsApp')
+    clickAnchor('a[href*="/admin/whatsapp-crm/conversations"]')
     cy.url().then((url) => { cy.log('URL after WhatsApp CRM click: ' + url) })
 
-    // WhatsApp → Templates
-    cy.contains('a', 'WhatsApp').click({ force: true })
-    cy.wait(1000)
-    cy.get('a[href*="/admin/whatsapp/templates"]').click({ force: true })
+    clickAnchorNamed('WhatsApp')
+    clickAnchor('a[href*="/admin/whatsapp/templates"]')
     cy.url().then((url) => { cy.log('URL after WhatsApp Templates click: ' + url) })
 
-    // Change Password
-    cy.contains('Change Password').click({ force: true })
-    cy.url().should('include', '/account/change-password')
+    clickAnchorNamed('Change Password')
+    expectPath('/account/change-password')
 
-    // Zoom Requests
-    cy.contains('Zoom Requests').click({ force: true })
-    cy.url().should('include', '/zoom-requests')
+    clickAnchor('a[data-admin-menu-item="zoom_requests"]')
+    expectPath('/zoom-requests')
 
-    // Zoom Accounts
-    cy.contains('Zoom Accounts').click({ force: true })
-    cy.url().should('include', '/zoom-accounts')
+    clickAnchorNamed('Zoom Accounts')
+    expectPath('/zoom-accounts')
 
-    // Logout
-    cy.contains('Log Out').click({ force: true })
-    cy.url().then((url) => { cy.log('Post-logout URL: ' + url); expect(url).to.satisfy((u) => u.includes('/login') || !u.includes('/dashboard')) })
+    // A browser click follows /logout to /login, then waits forever if that
+    // page asks for the gate password again. Check the redirect with auth instead.
+    cy.contains('a', 'Log Out', { timeout: 20000 }).invoke('attr', 'href').then((href) => {
+      cy.request({
+        url: href,
+        auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
+        followRedirect: false,
+        failOnStatusCode: false,
+      }).its('headers.location').should('include', '/login')
+    })
   })
-
-
+})

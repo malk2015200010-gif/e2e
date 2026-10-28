@@ -36,8 +36,8 @@ const CHECKOUT_STUDENT = STUDENT           // malk2015200010@gmail.com
 const ALT_STUDENT      = STUDENTS.find(s => s.email === 'malk2015200010b@gmail.com')
 
 // ─── Validate-voucher API endpoint ────────────────────────────────────────────
-const VALIDATE_URL = 'https://dev.mentoraeg.com/checkout/validate-voucher'
-const REMOVE_URL   = 'https://dev.mentoraeg.com/checkout/voucher/remove'
+const VALIDATE_URL = '/checkout/validate-voucher'
+const REMOVE_URL   = '/checkout/voucher/remove'
 
 // ─── Helper: login as student ─────────────────────────────────────────────────
 function loginStudent(user = CHECKOUT_STUDENT) {
@@ -57,7 +57,7 @@ function loginAdmin() {
 
 // ─── Helper: add first available course to cart then go to checkout ───────────
 function addCourseAndGoToCheckout() {
-  cy.visit('https://dev.mentoraeg.com/courses', {
+  cy.visit('/courses', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -75,7 +75,7 @@ function addCourseAndGoToCheckout() {
       cy.log('No purchasable courses visible — proceeding to checkout directly')
     }
   })
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -87,7 +87,7 @@ function addCourseAndGoToCheckout() {
 function goToCheckoutEmpty() {
   cy.clearCookies()
   cy.clearLocalStorage()
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -632,7 +632,7 @@ it('MEN-1393b | AC-24 — Same student cannot redeem the same voucher twice', ()
 
 it('MEN-1409 | AC-23 — Duplicate purchase of already-enrolled course is rejected even with voucher', () => {
   loginStudent()
-  cy.visit('https://dev.mentoraeg.com/courses', {
+  cy.visit('/courses', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -710,7 +710,7 @@ it('MEN-1400 | AC-30 — Instructor earnings dashboard shows gross amount, not d
 
   cy.url({ timeout: 30000 }).then((url) => {
     if (!url.includes('/login')) {
-      cy.visit('https://dev.mentoraeg.com/dashboard/earnings', {
+      cy.visit('/dashboard/earnings', {
         auth: HTTP_AUTH,
         failOnStatusCode: false,
         timeout: 60000,
@@ -737,7 +737,7 @@ it('MEN-1400 | AC-30 — Instructor earnings dashboard shows gross amount, not d
 it('MEN-1411 | AC-31 — Admin payment detail shows "student paid" amount alongside gross', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/payments', {
+  cy.visit('/admin/payments', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -776,7 +776,7 @@ it('MEN-1411 | AC-31 — Admin payment detail shows "student paid" amount alongs
 it('MEN-1405 | AC-15 — Admin payment detail includes voucher_id, cart_subtotal, voucher_discount, total_amount', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/payments', {
+  cy.visit('/admin/payments', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -814,7 +814,7 @@ it('MEN-1405 | AC-15 — Admin payment detail includes voucher_id, cart_subtotal
 it('MEN-1414 | AC-26 — Admin voucher detail shows platform discount cost (voucher_absorbed)', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/vouchers', {
+  cy.visit('/admin/vouchers', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -853,7 +853,7 @@ it('MEN-1414 | AC-26 — Admin voucher detail shows platform discount cost (vouc
 it('MEN-1407 | AC-28 — Admin can find offline payments; voucher data should sync on approval', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/payments', {
+  cy.visit('/admin/payments', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -943,7 +943,7 @@ it('MEN-1419 | AC-10 — Voucher field labels display in English by default', ()
 
 it('MEN-1420 | AC-10 — Voucher labels display in Arabic when lang=ar', () => {
   loginStudent()
-  cy.visit('https://dev.mentoraeg.com/checkout?lang=ar', {
+  cy.visit('/checkout?lang=ar', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -970,7 +970,7 @@ it('MEN-1421 | AC-20 — Voucher error messages display in Arabic when lang=ar',
   }).as('arabicError')
 
   loginStudent()
-  cy.visit('https://dev.mentoraeg.com/checkout?lang=ar', {
+  cy.visit('/checkout?lang=ar', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,

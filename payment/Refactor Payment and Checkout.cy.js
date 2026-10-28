@@ -77,33 +77,13 @@ describe('Refactor Payment and Checkout', () => {
   })
 
   it('TC5 | Empty cart checkout shows empty-cart message when cart has no items', () => {
+    // loginViaApi starts a new cookie jar; cart is session-scoped so checkout is empty.
     loginCheckoutStudent()
     go('/checkout')
-    cy.get('body').then(($body) => {
-      if (cartHasItems($body)) {
-        const remove = $body
-          .find('a, button')
-          .filter((_, el) =>
-            /remove|delete|×|حذف|إزالة/i.test(el.textContent || el.getAttribute('title') || ''),
-          )
-          .filter(':visible')
-        if (remove.length) {
-          cy.contains('a, button', /remove|delete|حذف|إزالة/i).filter(':visible').first().click({ force: true })
-          cy.reload()
-        } else {
-          cy.log('Could not clear cart via UI — skipping empty-cart copy assert')
-          return
-        }
-      }
+    cy.url({ timeout: 20000 }).should('include', '/checkout')
+    cy.get('body', { timeout: 15000 }).should(($body) => {
+      expect(cartHasItems($body), 'fresh session cart is empty').to.eq(false)
     })
-
-    go('/checkout')
-    cy.get('body', { timeout: 15000 }).then(($body) => {
-      if (cartHasItems($body)) {
-        cy.log('Cart still has items — empty-cart copy not asserted')
-        return
-      }
-      cy.wrap($body).invoke('text').should('match', /cart is empty|your cart is empty|سلة/i)
-    })
+    cy.contains(/there is nothing to checkout|your cart is empty|cart is empty/i).should('be.visible')
   })
 })

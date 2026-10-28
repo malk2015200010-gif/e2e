@@ -1,4 +1,8 @@
-const BASE = 'https://dev.mentoraeg.com'
+const BASE = String(process.env.CYPRESS_BASE_URL || '').replace(/\/$/, '')
+if (!BASE) {
+  console.error('Set CYPRESS_BASE_URL. Refusing to call a hardcoded host.')
+  process.exit(1)
+}
 const authUser = process.env.CYPRESS_auth_username || process.env.AUTH_USERNAME || ''
 const authPass = process.env.CYPRESS_auth_password || process.env.AUTH_PASSWORD || ''
 if (!authUser || !authPass) {

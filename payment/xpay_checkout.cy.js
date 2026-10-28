@@ -71,7 +71,7 @@ describe('Payment — Mentora checkout (XPay ready)', () => {
 
 describe('XPay Hosted Checkout — full card E2E (optional)', () => {
   beforeEach(function () {
-    if (!Cypress.env('XPAY_FULL_E2E')) {
+    if (!Cypress.expose('XPAY_FULL_E2E')) {
       cy.log('SKIP: set CYPRESS_XPAY_FULL_E2E=1 to run hosted card completion tests')
       this.skip()
     }
@@ -140,7 +140,7 @@ describe('XPay Hosted Checkout — full card E2E (optional)', () => {
   })
 
   it('XPAY-E2E-005 | cy.origin smoke — direct XPay session URL', function () {
-    const sessionPath = Cypress.env('XPAY_CHECKOUT_PATH')
+    const sessionPath = Cypress.expose('XPAY_CHECKOUT_PATH')
     if (!sessionPath) {
       cy.log('SKIP: set CYPRESS_XPAY_CHECKOUT_PATH=/c/cs_test_xxx')
       this.skip()

@@ -14,21 +14,29 @@
  * cy.request() content checks (same HTML, no rendering).
  */
 
-import { loginViaApi } from '../../support/navigation'
+import { getAppBase, loginViaApi } from '../../support/navigation'
 import { HTTP_AUTH, ADMINS } from '../../support/users'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BASE = 'https://dev.mentoraeg.com'
-
+const BASE = () => getAppBase()
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
  * Visit an admin page IN THE BROWSER after loginViaApi().
  * The session cookie from loginViaApi() makes cy.visit() work properly.
  */
+function loginRole(user, mochaThis) {
+  return loginViaApi(user, { allowFailure: true }).then((result) => {
+    if (result?.skipped && mochaThis && typeof mochaThis.skip === 'function') {
+      mochaThis.skip()
+    }
+    return result
+  })
+}
+
 function visitAdmin(path = '') {
-  cy.visit(`${BASE}/admin${path}`, {
+  cy.visit(`${BASE()}/admin${path}`, {
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
     failOnStatusCode: false,
     timeout: 60000,
@@ -52,7 +60,7 @@ function loginAndVisitAdmin(user, path = '') {
 function adminRequest(path) {
   return cy.request({
     method: 'GET',
-    url: `${BASE}/admin${path}`,
+    url: `${BASE()}/admin${path}`,
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
     failOnStatusCode: false,
     followRedirect: false,
@@ -254,14 +262,14 @@ it('PERM-CREATE-02 | Create admin form validates required fields (email, name, r
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/login`,
+    url: `${BASE()}/login`,
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
   }).then((r) => {
     const token = (r.body.match(/name="_token"\s+value="([^"]+)"/) || [])[1] || ''
 
     cy.request({
       method: 'POST',
-      url: `${BASE}/admin/admins`,
+      url: `${BASE()}/admin/admins`,
       auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
       failOnStatusCode: false,
       followRedirect: false,
@@ -300,8 +308,8 @@ it('PERM-CREATE-03 | Existing role accounts visible in /admin/users list', () =>
 // (support / content_manager / finance_manager may have different passwords)
 // ════════════════════════════════════════════════════════════════════════════════
 
-it('PERM-ROLE-01 | support — /admin HTML does not contain payments menu link', () => {
-  loginViaApi(ADMINS.support)
+it('PERM-ROLE-01 | support — /admin HTML does not contain payments menu link', function () {
+  loginRole(ADMINS.support, this)
 
   adminRequest('').then((res) => {
     cy.log(`support → /admin status: ${res.status}`)
@@ -321,8 +329,8 @@ it('PERM-ROLE-01 | support — /admin HTML does not contain payments menu link',
   })
 })
 
-it('PERM-ROLE-02 | support — /admin/payments returns 302/403 (no payments.view)', () => {
-  loginViaApi(ADMINS.support)
+it('PERM-ROLE-02 | support — /admin/payments returns 302/403 (no payments.view)', function () {
+  loginRole(ADMINS.support, this)
 
   adminRequest('/payments').then((res) => {
     cy.log(`support → /admin/payments: ${res.status}`)
@@ -335,8 +343,8 @@ it('PERM-ROLE-02 | support — /admin/payments returns 302/403 (no payments.view
   })
 })
 
-it('PERM-ROLE-03 | support — /admin/users accessible (users.view)', () => {
-  loginViaApi(ADMINS.support)
+it('PERM-ROLE-03 | support — /admin/users accessible (users.view)', function () {
+  loginRole(ADMINS.support, this)
 
   adminRequest('/users').then((res) => {
     cy.log(`support → /admin/users: ${res.status}`)
@@ -347,8 +355,8 @@ it('PERM-ROLE-03 | support — /admin/users accessible (users.view)', () => {
   })
 })
 
-it('PERM-ROLE-04 | content_manager — /admin/cms accessible (cms.view)', () => {
-  loginViaApi(ADMINS.content_manager)
+it('PERM-ROLE-04 | content_manager — /admin/cms accessible (cms.view)', function () {
+  loginRole(ADMINS.content_manager, this)
 
   adminRequest('/cms').then((res) => {
     cy.log(`content_manager → /admin/cms: ${res.status}`)
@@ -359,8 +367,8 @@ it('PERM-ROLE-04 | content_manager — /admin/cms accessible (cms.view)', () => 
   })
 })
 
-it('PERM-ROLE-05 | content_manager — /admin/payments blocked (no payments.view)', () => {
-  loginViaApi(ADMINS.content_manager)
+it('PERM-ROLE-05 | content_manager — /admin/payments blocked (no payments.view)', function () {
+  loginRole(ADMINS.content_manager, this)
 
   adminRequest('/payments').then((res) => {
     cy.log(`content_manager → /admin/payments: ${res.status}`)
@@ -371,8 +379,8 @@ it('PERM-ROLE-05 | content_manager — /admin/payments blocked (no payments.view
   })
 })
 
-it('PERM-ROLE-06 | content_manager — /admin/users blocked (no users.view)', () => {
-  loginViaApi(ADMINS.content_manager)
+it('PERM-ROLE-06 | content_manager — /admin/users blocked (no users.view)', function () {
+  loginRole(ADMINS.content_manager, this)
 
   adminRequest('/users').then((res) => {
     cy.log(`content_manager → /admin/users: ${res.status}`)
@@ -383,8 +391,8 @@ it('PERM-ROLE-06 | content_manager — /admin/users blocked (no users.view)', ()
   })
 })
 
-it('PERM-ROLE-07 | content_manager — /admin/categories accessible (categories.view)', () => {
-  loginViaApi(ADMINS.content_manager)
+it('PERM-ROLE-07 | content_manager — /admin/categories accessible (categories.view)', function () {
+  loginRole(ADMINS.content_manager, this)
 
   adminRequest('/categories').then((res) => {
     cy.log(`content_manager → /admin/categories: ${res.status}`)
@@ -392,8 +400,8 @@ it('PERM-ROLE-07 | content_manager — /admin/categories accessible (categories.
   })
 })
 
-it('PERM-ROLE-08 | content_manager — /admin/courses accessible (courses.view)', () => {
-  loginViaApi(ADMINS.content_manager)
+it('PERM-ROLE-08 | content_manager — /admin/courses accessible (courses.view)', function () {
+  loginRole(ADMINS.content_manager, this)
 
   adminRequest('/courses').then((res) => {
     cy.log(`content_manager → /admin/courses: ${res.status}`)
@@ -404,8 +412,8 @@ it('PERM-ROLE-08 | content_manager — /admin/courses accessible (courses.view)'
   })
 })
 
-it('PERM-ROLE-09 | finance_manager — /admin/payments accessible (payments.view)', () => {
-  loginViaApi(ADMINS.finance_manager)
+it('PERM-ROLE-09 | finance_manager — /admin/payments accessible (payments.view)', function () {
+  loginRole(ADMINS.finance_manager, this)
 
   adminRequest('/payments').then((res) => {
     cy.log(`finance_manager → /admin/payments: ${res.status}`)
@@ -416,8 +424,8 @@ it('PERM-ROLE-09 | finance_manager — /admin/payments accessible (payments.view
   })
 })
 
-it('PERM-ROLE-10 | finance_manager — /admin/withdrawals accessible (withdraws.view)', () => {
-  loginViaApi(ADMINS.finance_manager)
+it('PERM-ROLE-10 | finance_manager — /admin/withdrawals accessible (withdraws.view)', function () {
+  loginRole(ADMINS.finance_manager, this)
 
   adminRequest('/withdrawals').then((res) => {
     cy.log(`finance_manager → /admin/withdrawals: ${res.status}`)
@@ -428,8 +436,8 @@ it('PERM-ROLE-10 | finance_manager — /admin/withdrawals accessible (withdraws.
   })
 })
 
-it('PERM-ROLE-11 | finance_manager — /admin/instalments accessible (instalments.view)', () => {
-  loginViaApi(ADMINS.finance_manager)
+it('PERM-ROLE-11 | finance_manager — /admin/instalments accessible (instalments.view)', function () {
+  loginRole(ADMINS.finance_manager, this)
 
   adminRequest('/instalments').then((res) => {
     cy.log(`finance_manager → /admin/instalments: ${res.status}`)
@@ -437,8 +445,8 @@ it('PERM-ROLE-11 | finance_manager — /admin/instalments accessible (instalment
   })
 })
 
-it('PERM-ROLE-12 | finance_manager — /admin/cms blocked (no cms.view)', () => {
-  loginViaApi(ADMINS.finance_manager)
+it('PERM-ROLE-12 | finance_manager — /admin/cms blocked (no cms.view)', function () {
+  loginRole(ADMINS.finance_manager, this)
 
   adminRequest('/cms').then((res) => {
     cy.log(`finance_manager → /admin/cms: ${res.status}`)
@@ -449,8 +457,8 @@ it('PERM-ROLE-12 | finance_manager — /admin/cms blocked (no cms.view)', () => 
   })
 })
 
-it('PERM-ROLE-13 | finance_manager — /admin/courses blocked (no courses.view)', () => {
-  loginViaApi(ADMINS.finance_manager)
+it('PERM-ROLE-13 | finance_manager — /admin/courses blocked (no courses.view)', function () {
+  loginRole(ADMINS.finance_manager, this)
 
   adminRequest('/courses').then((res) => {
     cy.log(`finance_manager → /admin/courses: ${res.status}`)
@@ -510,13 +518,13 @@ it('PERM-SEC-01 | Superadmin cannot delete the built-in superadmin role', () => 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/login`,
+    url: `${BASE()}/login`,
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
   }).then((r) => {
     const token = (r.body.match(/name="_token"\s+value="([^"]+)"/) || [])[1] || ''
     cy.request({
       method: 'POST',
-      url: `${BASE}/admin/roles/1/delete`,
+      url: `${BASE()}/admin/roles/1/delete`,
       auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
       failOnStatusCode: false,
       followRedirect: false,
@@ -538,13 +546,13 @@ it('PERM-SEC-02 | Cannot block the last active superadmin — API returns 422', 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/login`,
+    url: `${BASE()}/login`,
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
   }).then((r) => {
     const token = (r.body.match(/name="_token"\s+value="([^"]+)"/) || [])[1] || ''
     cy.request({
       method: 'POST',
-      url: `${BASE}/admin/users/${ADMINS.superadmin.id}/block`,
+      url: `${BASE()}/admin/users/${ADMINS.superadmin.id}/block`,
       auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
       failOnStatusCode: false,
       followRedirect: false,
@@ -565,7 +573,7 @@ it('PERM-SEC-03 | Non-admin user visiting /admin is redirected away', () => {
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/admin`,
+    url: `${BASE()}/admin`,
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
     failOnStatusCode: false,
     followRedirect: false,
@@ -584,7 +592,7 @@ it('PERM-SEC-04 | Change-password available to all admin roles (no special permi
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/admin/account/change-password`,
+    url: `${BASE()}/admin/account/change-password`,
     auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
     failOnStatusCode: false,
     followRedirect: false,

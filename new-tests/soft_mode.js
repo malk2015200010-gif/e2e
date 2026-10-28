@@ -1,8 +1,9 @@
 /**
- * Soft-pass for new-tests specs (also covered globally by e2e/cypress-support.js).
+ * Soft-pass is DISABLED.
+ *
+ * Previously this file registered Cypress.on('fail') → return false, which
+ * stayed active for the whole Cypress session (including other specs like
+ * parent_phone) and caused false greens + cy.first() on undefined.
+ *
+ * Keep this file as a no-op so existing imports do not break.
  */
-Cypress.on('uncaught:exception', () => false)
-Cypress.on('fail', (error) => {
-  Cypress.log({ name: 'soft-pass', message: error.message })
-  return false
-})

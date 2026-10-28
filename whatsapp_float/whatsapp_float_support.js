@@ -3,40 +3,36 @@
  *
  * Story: Show a fixed WhatsApp button on all public pages. Clicking it opens
  * a chat with Mentora via the existing wa.me URL. Users can dismiss it with
- * a close button; dismissal persists across visits.
+ * a close button.
+ *
+ * Business update: icon is visible again on reload — dismiss only removes the
+ * element for the current page instance (no localStorage persistence).
  *
  * Live markup (probed on dev.mentoraeg.com):
  *   <div id="mentora-whatsapp-float" class="mentora-whatsapp-float" hidden
  *        role="complementary" aria-label="Chat with Mentora on WhatsApp">
  *     <button class="mentora-whatsapp-float__dismiss" aria-label="Dismiss WhatsApp chat button">×</button>
  *     <a class="mentora-whatsapp-float__link" target="_blank" rel="noopener"
- *        href="https://wa.me/201225269444?text=...">
+ *        href="https://wa.me/201202292768?text=...">
  *       <i class="la la-whatsapp"></i>
  *     </a>
  *   </div>
  *
  * Behavior (inline script):
- *   - localStorage key: mentora_whatsapp_float_dismissed
- *   - If not dismissed -> floatEl.hidden = false (shown)
- *   - If dismissed      -> stays hidden (element still rendered, just hidden)
- *   - Clicking dismiss  -> sets the localStorage flag AND removes the element
- *     from the DOM for the current page instance
+ *   - Always show: floatEl.hidden = false on load
+ *   - Clicking dismiss -> floatEl.remove() for this page only
+ *   - Reload / new visit -> widget rendered again and shown
  */
 
-import { loginViaApi } from '../../support/navigation.js'
-import { STUDENT, ADMIN } from '../../support/users.js'
+import { getAppBase, loginViaApi } from '../../support/navigation.js'
+import { STUDENT, ADMIN, basicAuth } from '../../support/users.js'
 
-export const BASE = 'https://dev.mentoraeg.com'
-export const AUTH = {
-  get username() {
-    return Cypress.env('auth_username') || ''
-  },
-  get password() {
-    return Cypress.env('auth_password') || ''
-  },
-}
+export const BASE = () => getAppBase()
+export const AUTH = basicAuth
 
-export const WHATSAPP_PHONE = '201225269444'
+
+export const WHATSAPP_PHONE = '201202292768'
+/** Legacy key (no longer used by product for persistence; kept for negative asserts). */
 export const STORAGE_KEY = 'mentora_whatsapp_float_dismissed'
 
 export const WIDGET_SEL = '#mentora-whatsapp-float'
@@ -59,7 +55,7 @@ export const PUBLIC_PAGES = ['', 'courses', 'login', 'register', 'about-us', 'co
 // banner entirely (confirmed against the live server) instead of clicking
 // through an unrelated widget in every test.
 const suppressCookieConsentBar = () => {
-  cy.setCookie('mentora_analytics_consent', 'granted', { domain: 'dev.mentoraeg.com' })
+  cy.setCookie('mentora_analytics_consent', 'granted', { domain: new URL(BASE()).hostname })
 }
 
 export const go = (path, opts = {}) => {
@@ -70,9 +66,9 @@ export const go = (path, opts = {}) => {
   // "https:/", since it's just as much a run of 2+ slashes as an accidental
   // "//dashboard" would be.
   const cleanPath = String(path).replace(/^\/+/, '')
-  const url = cleanPath ? `${BASE}/${cleanPath}` : `${BASE}/`
+  const url = cleanPath ? `${BASE()}/${cleanPath}` : `${BASE()}/`
   return cy.visit(url, {
-    auth: AUTH,
+    auth: basicAuth(),
     failOnStatusCode: false,
     timeout: 60000,
     ...opts,
@@ -80,13 +76,12 @@ export const go = (path, opts = {}) => {
 }
 
 /**
- * Fresh, guest session — visits the page, wipes the dismissal flag (must be
- * done after the first visit so the browser is on the right origin), then
- * reloads so the inline "is it dismissed?" script re-evaluates from scratch.
+ * Fresh guest session on a public page (widget always shown on load).
  */
 export const goFresh = (path = '') => {
   cy.clearCookies()
   go(path)
+  // Clear any leftover legacy dismiss flag from older product versions.
   clearDismissedFlag()
   cy.reload()
 }
@@ -113,8 +108,7 @@ export const assertWidgetVisible = () => {
 export const assertWidgetNotVisible = () => {
   cy.get('body').then(($body) => {
     const $w = $body.find(WIDGET_SEL)
-    // Either fully removed from the DOM (post-dismiss-click) or still
-    // present but hidden (post-reload, dismissed flag already set).
+    // After dismiss click the element is removed from the DOM.
     if ($w.length === 0) return
     cy.wrap($w).should('satisfy', ($el) => $el.is(':hidden') || $el.attr('hidden') !== undefined)
   })

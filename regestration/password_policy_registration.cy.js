@@ -16,6 +16,7 @@ import {
   WEAK_PASSWORDS,
   PASSWORD_CHECKLIST_RULES,
   fillRegisterForm,
+  typeConfirmPassword,
   submitRegister,
   assertRegistrationSucceeded,
   loginWithCredentials,
@@ -123,10 +124,14 @@ describe('Password policy — grandfather (existing accounts)', () => {
 describe('Password policy — password mismatch still blocked', () => {
   it('PW-REG-MISMATCH | confirm password must match', () => {
     fillRegisterForm({ role: 'student', password: VALID_NEW_PASSWORD })
-    cy.get('input[name="password_confirmation"], input[id="password-confirm"]').first()
-      .clear({ force: true }).type('Wrong@123', { force: true })
-    submitRegister()
+    typeConfirmPassword('Wrong@123')
+    // The password itself passes the checklist, so the browser POSTs.
+    // submitRegister() asserts we left /register; a mismatch must stay and show the server error.
+    cy.intercept({ method: 'POST', url: /\/register(?:\?|$)/ }).as('mismatchPost')
+    cy.get('#registerForm button[type="submit"]').filter(':visible').first().click({ force: true })
+    cy.wait('@mismatchPost', { timeout: 25000 })
     cy.url({ timeout: 15000 }).should('include', '/register')
+    cy.get('body').invoke('text').should('match', /password confirmation does not match/i)
   })
 })
 

@@ -11,21 +11,21 @@
  * Admin CMS tested via: loginViaApi() → cy.visit('/admin/cms', { auth })
  */
 
-import { visitWithAuth, loginViaApi } from '../../support/navigation'
+import { getAppBase, visitWithAuth, loginViaApi } from '../../support/navigation'
 import { HTTP_AUTH, ADMIN } from '../../support/users'
 
-const BASE   = 'https://dev.mentoraeg.com'
+const BASE = () => getAppBase()
 const AUTH = HTTP_AUTH
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function visitPublic(path) {
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false })
+  cy.visit(`${BASE()}${path}`, { auth: AUTH, failOnStatusCode: false })
 }
 
 function loginAndVisitCms(path = '') {
   loginViaApi(ADMIN)
-  cy.visit(`${BASE}/admin/cms${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.visit(`${BASE()}/admin/cms${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 }
 
@@ -34,13 +34,13 @@ function loginAndVisitCms(path = '') {
 // which 404s).
 function loginAndVisitCmsPost(path = '') {
   loginViaApi(ADMIN)
-  cy.visit(`${BASE}/admin/cms/post${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.visit(`${BASE()}/admin/cms/post${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 }
 
 function loginAndVisitCmsPage(path = '') {
   loginViaApi(ADMIN)
-  cy.visit(`${BASE}/admin/cms/page${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
+  cy.visit(`${BASE()}/admin/cms/page${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000 })
   cy.get('body', { timeout: 15000 }).should('exist')
 }
 
@@ -52,7 +52,7 @@ it('MEN-882 | About Us page is publicly accessible at /about-us (200 response)',
   // Check the real HTTP status directly — checking body text for a bare '404'
   // is unreliable because the Laravel Debugbar (enabled on dev) injects debug
   // JSON into every page that can incidentally contain the substring '404'.
-  cy.request({ url: `${BASE}/about-us`, auth: AUTH, failOnStatusCode: false }).then((res) => {
+  cy.request({ url: `${BASE()}/about-us`, auth: AUTH, failOnStatusCode: false }).then((res) => {
     expect(res.status).to.eq(200)
   })
 
@@ -215,7 +215,7 @@ it('MEN-931 | Saving CMS post does not create duplicates — POST to /admin/cms/
   // Get CSRF token from the actual create form (not /login)
   cy.request({
     method: 'GET',
-    url: `${BASE}/admin/cms/post/create`,
+    url: `${BASE()}/admin/cms/post/create`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((r) => {
@@ -225,7 +225,7 @@ it('MEN-931 | Saving CMS post does not create duplicates — POST to /admin/cms/
     // error/redirect, not a 500, and does not silently create a duplicate.
     cy.request({
       method: 'POST',
-      url: `${BASE}/admin/cms/post/create`,
+      url: `${BASE()}/admin/cms/post/create`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: false,
@@ -273,7 +273,7 @@ it('MEN-933 | Arabic version URL follows expected -ar suffix format', () => {
   // Check that /about-us-ar exists or redirects to Arabic version
   cy.request({
     method: 'GET',
-    url: `${BASE}/about-us-ar`,
+    url: `${BASE()}/about-us-ar`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -292,7 +292,7 @@ it('MEN-933 | Arabic version URL follows expected -ar suffix format', () => {
   // Check blog post Arabic URL
   cy.request({
     method: 'GET',
-    url: `${BASE}/how-to-boost-your-online-course-to-maximum-potential-students-ar`,
+    url: `${BASE()}/how-to-boost-your-online-course-to-maximum-potential-students-ar`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -325,7 +325,7 @@ it('MEN-934 | Language switcher toggles between English and Arabic versions', ()
       cy.log('Language switcher link not found on About Us page — checking locale endpoint')
       cy.request({
         method: 'GET',
-        url: `${BASE}/locale/ar`,
+        url: `${BASE()}/locale/ar`,
         auth: AUTH,
         failOnStatusCode: false,
         followRedirect: false,
@@ -354,7 +354,7 @@ it('MEN-936 | Draft/unpublished pages are not accessible publicly — return 404
   // Try to access a page that doesn't exist / is unpublished
   cy.request({
     method: 'GET',
-    url: `${BASE}/this-page-does-not-exist-unpublished-draft-test`,
+    url: `${BASE()}/this-page-does-not-exist-unpublished-draft-test`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -472,7 +472,7 @@ it('MEN-887b | Admin CMS pages render correctly on mobile viewport (375px)', () 
   cy.viewport(375, 812)
   loginViaApi(ADMIN)
 
-  cy.visit(`${BASE}/about-us`, {
+  cy.visit(`${BASE()}/about-us`, {
     auth: AUTH,
     failOnStatusCode: false,
   })

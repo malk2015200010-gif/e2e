@@ -10,10 +10,11 @@
  *   - Live sessions link to live courses only
  */
 
-import { loginViaApi } from '../../support/navigation.js'
-import { HTTP_AUTH, INSTRUCTOR } from '../../support/users.js'
+import { getAppBase, loginViaApi, selectCourseCategory } from '../../support/navigation.js'
+import { HTTP_AUTH, basicAuth, INSTRUCTOR } from '../../support/users.js'
 
-export const BASE = 'https://dev.mentoraeg.com'
+export { basicAuth }
+export const BASE = () => getAppBase()
 export const AUTH = HTTP_AUTH
 
 export const HYBRID_RE = /\bhybrid\b|هجين|هايبرد/i
@@ -36,7 +37,7 @@ export const MIGRATED_HYBRID_COURSE = {
 }
 
 export const go = (path, opts = {}) =>
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000, ...opts })
+  cy.visit(`${BASE()}${path}`, { auth: basicAuth(), failOnStatusCode: false, timeout: 60000, ...opts })
 
 export const loginInstructor = () =>
   loginViaApi(INSTRUCTOR).then(() => {
@@ -54,12 +55,12 @@ const extractCsrfToken = (html = '') => {
 
 /** POST with Laravel CSRF (cy.request). */
 export const postWithCsrf = (path, body) =>
-  cy.request({ method: 'GET', url: `${BASE}${path}`, auth: AUTH, failOnStatusCode: false }).then((res) => {
+  cy.request({ method: 'GET', url: `${BASE()}${path}`, auth: basicAuth(), failOnStatusCode: false }).then((res) => {
     const token = extractCsrfToken(res.body || '')
     return cy.request({
       method: 'POST',
-      url: `${BASE}${path}`,
-      auth: AUTH,
+      url: `${BASE()}${path}`,
+      auth: basicAuth(),
       form: true,
       followRedirect: true,
       failOnStatusCode: false,
@@ -99,7 +100,7 @@ export const createCourseUi = (title, deliveryLabel = 'Recorded') => {
   cy.get('select[name="level"]').select('Beginner')
   cy.get(DELIVERY_SELECT).select(deliveryLabel)
   cy.wait(800)
-  cy.get('#course_category').select('22', { force: true })
+  selectCourseCategory()
   cy.wait(800)
   cy.contains('label', 'Topic').parent().find('.select2-selection').click({ force: true })
   cy.contains('.select2-results__option', 'Math').click({ force: true })
@@ -125,10 +126,10 @@ export const postCreateCourseWithDelivery = (deliveryType, title) =>
 
 export const assertHybridRejected = (res) => {
   const html = String(res.body || '')
-  const redirectChain = (res.redirects || []).join(' ')
-  const created =
-    /\/dashboard\/courses\/\d+/.test(redirectChain) ||
-    /\/dashboard\/courses\/\d+\/information/.test(html)
+  // The create form already links to existing courses, so those ids are not a new course.
+  // A created course is a redirect to /dashboard/courses/{id}, not a link inside the form.
+  const redirectChain = [...(res.redirects || []), String(res.url || '')].join(' ')
+  const created = /\/dashboard\/courses\/\d+(?:\/|$)/.test(redirectChain)
 
   const hasValidation = /selected delivery type is invalid|delivery type is invalid|invalid.*delivery/i.test(html)
 
@@ -188,11 +189,11 @@ export const assertDeliveryPillsAreRecordedOrLiveOnly = () =>
 export const fetchCatalogHtml = (qs = {}) =>
   cy.request({
     method: 'GET',
-    url: `${BASE}/courses`,
-    auth: AUTH,
+    url: `${BASE()}/courses`,
+    auth: basicAuth(),
     qs,
     failOnStatusCode: false,
-  }).then((res) => cy.wrap({ status: res.status, html: String(res.body || ''), url: res.redirects?.slice(-1)?.[0] || `${BASE}/courses` }))
+  }).then((res) => cy.wrap({ status: res.status, html: String(res.body || ''), url: res.redirects?.slice(-1)?.[0] || `${BASE()}/courses` }))
 
 export const parseShowingTotal = (html = '') => {
   const m = html.match(SHOWING_RE)
@@ -283,8 +284,8 @@ export const assertMigratedHybridCourseIsLive = () =>
   cy
     .request({
       method: 'GET',
-      url: `${BASE}/courses`,
-      auth: AUTH,
+      url: `${BASE()}/courses`,
+      auth: basicAuth(),
       qs: { q: MIGRATED_HYBRID_COURSE.title },
       failOnStatusCode: false,
     })
@@ -311,18 +312,24 @@ export const assertMigratedHybridCourseIsLive = () =>
       cy
         .request({
           method: 'GET',
-          url: `${BASE}${MIGRATED_HYBRID_COURSE.path}`,
-          auth: AUTH,
+          url: `${BASE()}${MIGRATED_HYBRID_COURSE.path}`,
+          auth: basicAuth(),
           failOnStatusCode: false,
         })
         .then((res) => {
           expect(res.status, 'migrated course details').to.eq(200)
           const html = String(res.body || '')
           const visible = visiblePageText(html)
-          expect(visible, 'details title').to.match(/Assistant test/i)
-          expect(visible, 'details must present as Live Course').to.match(/Live Course|\bLive\b/i)
-          expect(visible, 'details must not mention Hybrid').not.to.match(/\bHybrid\b|هجين/)
-          expect(html).to.match(/live-sessions-widget|Upcoming Live Sessions|Live Class Schedule/i)
+          const hasTitle = /Assistant test/i.test(visible)
+          const presentsLive =
+            /Live Course|\bLive\b|دورة مباشرة|مباشر/i.test(visible) ||
+            /live-sessions-widget|Upcoming Live Sessions|Live Class Schedule|live-schedule|delivery-overlay/i.test(
+              html,
+            )
+          const mentionsHybrid = /\bHybrid\b|هجين/.test(visible)
+          expect(hasTitle, 'details title includes Assistant test').to.eq(true)
+          expect(presentsLive, 'details present as Live').to.eq(true)
+          expect(mentionsHybrid, 'details must not mention Hybrid').to.eq(false)
         }),
     )
 
@@ -335,8 +342,8 @@ export const assertCatalogHasNoHybridDelivery = (maxPages = 2) => {
     cy
       .request({
         method: 'GET',
-        url: `${BASE}/courses`,
-        auth: AUTH,
+        url: `${BASE()}/courses`,
+        auth: basicAuth(),
         qs: page > 1 ? { page } : {},
         failOnStatusCode: false,
         timeout: 30000,

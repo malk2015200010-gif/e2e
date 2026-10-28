@@ -17,20 +17,44 @@
  * All form-based logins use loginViaApi() to properly establish the Laravel session.
  */
 
-import { loginViaApi } from '../../support/navigation.js'
+import { getAppBase, loginViaApi } from '../../support/navigation.js'
+import { typeConfirmPassword } from '../regestration/password_policy_support.js'
 import { HTTP_AUTH, ADMIN, STUDENT, INSTRUCTOR } from '../../support/users.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const BASE  = 'https://dev.mentoraeg.com'
+const BASE = () => getAppBase()
 const AUTH  = HTTP_AUTH
 
 /** Helper: visit with HTTP Basic Auth */
 const go = (path, opts = {}) =>
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, ...opts })
+  cy.visit(`${BASE()}${path}`, { auth: AUTH, failOnStatusCode: false, ...opts })
+
+/** Student register requires parent phone; use a unique student phone each time. */
+const fillRegisterPhones = () => {
+  cy.get('body').then(($body) => {
+    if ($body.find('input[name="user_as"][value="student"]').length) {
+      cy.get('input[name="user_as"][value="student"]').check({ force: true })
+    }
+  })
+  cy.get('body').then(($b) => {
+    if ($b.find('#phone_code').length) cy.get('#phone_code').select('20', { force: true })
+  })
+  cy.get('#phone_number')
+    .clear({ force: true })
+    .type(`10${String(Date.now()).slice(-8)}`, { force: true })
+  cy.get('body').then(($b) => {
+    const $parent = $b.find('#parent_phone_number, input[name="parent_phone_number"]').filter(':visible')
+    if (!$parent.length) return
+    if ($b.find('#parent_phone_code').length) {
+      cy.get('#parent_phone_code').select('20', { force: true })
+    }
+    cy.wrap($parent.first()).clear({ force: true }).type('1098765432', { force: true })
+  })
+}
 
 /** Helper: POST request with CSRF token */
 const postWithCsrf = (url, bodyFn) => {
-  return cy.request({ method: 'GET', url: `${BASE}${url}`, auth: AUTH, failOnStatusCode: false })
+  return cy.request({ method: 'GET', url: `${BASE()}${url}`, auth: AUTH, failOnStatusCode: false })
     .then((res) => {
       const html = res.body || ''
       const m = html.match(/name="_token"\s+value="([^"]+)"/) ||
@@ -38,7 +62,7 @@ const postWithCsrf = (url, bodyFn) => {
       const token = m ? m[1] : ''
       return cy.request({
         method: 'POST',
-        url: `${BASE}${url}`,
+        url: `${BASE()}${url}`,
         auth: AUTH,
         form: true,
         followRedirect: true,
@@ -73,9 +97,9 @@ const registerAndLogin = (overrides = {}) => {
 
   cy.get('input[name="name"]').first().clear().type(name)
   cy.get('input[name="email"]').first().clear({ force: true }).type(email, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type(password)
-  cy.get('input[name="password_confirmation"]').first().clear().type(password)
+  typeConfirmPassword(password)
 
   // Target the Register submit button specifically by its text content
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
@@ -125,9 +149,9 @@ it('EV-001 | [Positive] New student signup redirects to /email/verify notice pag
 
   cy.get('input[name="name"]').first().clear().type('EV Test Student')
   cy.get('input[name=\"email\"]').first().clear({ force: true }).type(email, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Test@123456')
+  typeConfirmPassword('Test@123456')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.url({ timeout: 20000 }).then((url) => {
@@ -152,9 +176,9 @@ it('EV-002 | [Positive] User remains logged in after signup (not sent back to /l
 
   cy.get('input[name="name"]').first().clear().type('EV Stay Logged')
   cy.get('input[name=\"email\"]').first().clear({ force: true }).type(email, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Test@123456')
+  typeConfirmPassword('Test@123456')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.url({ timeout: 20000 }).then((url) => {
@@ -170,7 +194,7 @@ it('EV-003 | [Positive] /email/verify notice page loads with resend button (via 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify`,
+    url: `${BASE()}/email/verify`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -217,7 +241,7 @@ it('EV-005 | [Negative] Unverified user blocked from /dashboard — redirected t
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/dashboard`,
+    url: `${BASE()}/dashboard`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -242,7 +266,7 @@ it('EV-006 | [Negative] Unverified user blocked from checkout — redirected or 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/checkout`,
+    url: `${BASE()}/checkout`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -266,7 +290,7 @@ it('EV-007 | [Negative] Unverified user blocked from instructor dashboard tools'
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/instructor`,
+    url: `${BASE()}/instructor`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -288,7 +312,7 @@ it('EV-008 | [Positive] Unverified user CAN access public course catalog', () =>
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/courses`,
+    url: `${BASE()}/courses`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -319,7 +343,7 @@ it('EV-010 | [Positive] Admin is exempt from email verification gating', () => {
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/admin`,
+    url: `${BASE()}/admin`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -338,7 +362,7 @@ it('EV-011 | [Negative] Unverified user cannot access free-enroll route', () => 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/enroll`,
+    url: `${BASE()}/enroll`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -366,7 +390,7 @@ it('EV-012 | [Negative] Invalid/tampered verification link returns 403 or error'
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify/${fakeId}/${fakeHash}?expires=${fakeTime}&signature=forged`,
+    url: `${BASE()}/email/verify/${fakeId}/${fakeHash}?expires=${fakeTime}&signature=forged`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -386,7 +410,7 @@ it('EV-012 | [Negative] Invalid/tampered verification link returns 403 or error'
 it('EV-013 | [Negative] Verification link with missing signature parameter is rejected', () => {
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify/1/somehash`,
+    url: `${BASE()}/email/verify/1/somehash`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -404,7 +428,7 @@ it('EV-014 | [Negative] Expired verification link (simulated past timestamp) is 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify/1/somehash?expires=${pastTimestamp}&signature=${fakeSignature}`,
+    url: `${BASE()}/email/verify/1/somehash?expires=${pastTimestamp}&signature=${fakeSignature}`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -431,7 +455,7 @@ it('EV-015 | [Positive] Authenticated user can request resend from notice page',
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify`,
+    url: `${BASE()}/email/verify`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((res) => {
@@ -447,7 +471,7 @@ it('EV-015 | [Positive] Authenticated user can request resend from notice page',
 
     cy.request({
       method: 'POST',
-      url: `${BASE}/email/verification-notification`,
+      url: `${BASE()}/email/verification-notification`,
       auth: AUTH,
       form: true,
       followRedirect: true,
@@ -472,7 +496,7 @@ it('EV-016 | [Negative] Unauthenticated user cannot POST to resend endpoint', ()
 
   cy.request({
     method: 'POST',
-    url: `${BASE}/email/verification-notification`,
+    url: `${BASE()}/email/verification-notification`,
     auth: AUTH,
     form: true,
     followRedirect: false,
@@ -493,7 +517,7 @@ it('EV-017 | [Negative] Resend is throttled — 6 requests per minute', () => {
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify`,
+    url: `${BASE()}/email/verify`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((res) => {
@@ -508,7 +532,7 @@ it('EV-017 | [Negative] Resend is throttled — 6 requests per minute', () => {
 
     const makeResend = (n) => cy.request({
       method: 'POST',
-      url: `${BASE}/email/verification-notification`,
+      url: `${BASE()}/email/verification-notification`,
       auth: AUTH,
       form: true,
       followRedirect: true,
@@ -537,9 +561,9 @@ it('EV-018 | [Negative] Duplicate email registration rejected with clear message
   // Use an email that already exists in the system
   cy.get('input[name="name"]').first().clear().type('Duplicate Test')
   cy.get('input[name=\"email\"]').first().clear({ force: true }).type(STUDENT.email, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Test@123456')
+  typeConfirmPassword('Test@123456')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.get('body', { timeout: 10000 }).then(($body) => {
@@ -555,7 +579,7 @@ it('EV-018 | [Negative] Duplicate email registration rejected with clear message
 })
 
 it('EV-019 | [Negative] Duplicate email registration via cy.request returns 422', () => {
-  cy.request({ method: 'GET', url: `${BASE}/register`, auth: AUTH, failOnStatusCode: false })
+  cy.request({ method: 'GET', url: `${BASE()}/register`, auth: AUTH, failOnStatusCode: false })
     .then((res) => {
       const html  = res.body || ''
       const m     = html.match(/name="_token"\s+value="([^"]+)"/)
@@ -563,7 +587,7 @@ it('EV-019 | [Negative] Duplicate email registration via cy.request returns 422'
 
       return cy.request({
         method: 'POST',
-        url: `${BASE}/register`,
+        url: `${BASE()}/register`,
         auth: AUTH,
         form: true,
         followRedirect: false,
@@ -594,7 +618,7 @@ it('EV-020 | [Negative] No second account created on duplicate email attempt', (
   // Check user count before
   cy.request({
     method: 'GET',
-    url: `${BASE}/admin/users?search=${encodeURIComponent(STUDENT.email)}`,
+    url: `${BASE()}/admin/users?search=${encodeURIComponent(STUDENT.email)}`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((res) => {
@@ -632,7 +656,7 @@ it('EV-021 | [Positive] Forgot-password form accessible and accepts email', () =
 })
 
 it('EV-022 | [Positive] Forgot-password endpoint accepts unverified email without error', () => {
-  cy.request({ method: 'GET', url: `${BASE}/forgot-password`, auth: AUTH, failOnStatusCode: false })
+  cy.request({ method: 'GET', url: `${BASE()}/forgot-password`, auth: AUTH, failOnStatusCode: false })
     .then((res) => {
       const html  = res.body || ''
       const m     = html.match(/name="_token"\s+value="([^"]+)"/)
@@ -640,7 +664,7 @@ it('EV-022 | [Positive] Forgot-password endpoint accepts unverified email withou
 
       return cy.request({
         method: 'POST',
-        url: `${BASE}/forgot-password`,
+        url: `${BASE()}/forgot-password`,
         auth: AUTH,
         form: true,
         followRedirect: true,
@@ -667,7 +691,7 @@ it('EV-023 | [Positive] Unverified user can still log in (soft gate, not hard bl
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/`,
+    url: `${BASE()}/`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -687,7 +711,7 @@ it('EV-024 | [Positive] After login, unverified user is redirected to /email/ver
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/dashboard`,
+    url: `${BASE()}/dashboard`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -716,7 +740,7 @@ it('EV-025 | [Positive] Verified student redirected to home/dashboard (not stuck
   cy.url({ timeout: 15000 }).then((url) => {
     cy.log(`Verified student URL: ${url}`)
     const isAtHome = url.includes('/dashboard') || url.includes('/courses') ||
-      url.includes('/home') || url === `${BASE}/`
+      url.includes('/home') || url === `${BASE()}/`
     cy.log(`At home/dashboard: ${isAtHome}`)
     if (isAtHome) {
       cy.log('PASS: Verified student lands on home/dashboard ✓')
@@ -733,7 +757,7 @@ it('EV-026 | [Positive] Verified instructor is NOT stuck on verify page and can 
   // Check the instructor area is reachable (not blocked by email verify gate)
   cy.request({
     method: 'GET',
-    url: `${BASE}/instructor`,
+    url: `${BASE()}/instructor`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -765,7 +789,7 @@ it('EV-027 | [Positive] Admin access to /admin not blocked by email verification
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/admin`,
+    url: `${BASE()}/admin`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -802,7 +826,7 @@ it('EV-029 | [Positive] Existing student account not prompted to re-verify after
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/courses`,
+    url: `${BASE()}/courses`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -828,7 +852,7 @@ it('EV-030 | [Positive] OAuth redirect endpoints exist and return valid response
   providers.forEach((provider) => {
     cy.request({
       method: 'GET',
-      url: `${BASE}/auth/${provider}`,
+      url: `${BASE()}/auth/${provider}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: false,
@@ -848,7 +872,7 @@ it('EV-030 | [Positive] OAuth redirect endpoints exist and return valid response
 it('EV-031 | [Positive] OAuth callback route structure exists for auto-verification', () => {
   cy.request({
     method: 'GET',
-    url: `${BASE}/auth/google/callback`,
+    url: `${BASE()}/auth/google/callback`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -872,7 +896,7 @@ it('EV-032 | [Positive] Verification notice page has English copy', () => {
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify`,
+    url: `${BASE()}/email/verify`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -897,13 +921,13 @@ it('EV-033 | [Positive] Verification notice page has Arabic copy after locale sw
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/locale/ar`,
+    url: `${BASE()}/locale/ar`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then(() => {
     cy.request({
       method: 'GET',
-      url: `${BASE}/email/verify`,
+      url: `${BASE()}/email/verify`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,
@@ -964,11 +988,11 @@ it('EV-035 | [Positive] Register page renders with correct EN labels and no brok
 })
 
 it('EV-036 | [Positive] Register page has Arabic copy after locale switch', () => {
-  cy.request({ method: 'GET', url: `${BASE}/locale/ar`, auth: AUTH, failOnStatusCode: false })
+  cy.request({ method: 'GET', url: `${BASE()}/locale/ar`, auth: AUTH, failOnStatusCode: false })
     .then(() => {
       cy.request({
         method: 'GET',
-        url: `${BASE}/register`,
+        url: `${BASE()}/register`,
         auth: AUTH,
         failOnStatusCode: false,
       }).then((res) => {
@@ -997,7 +1021,7 @@ it('EV-037 | [Negative] Registration fails with empty email field', () => {
   cy.get('input[name="name"]').first().clear().type('NoEmail User')
   cy.get('input[name=\"email\"]').first().clear({ force: true })
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Test@123456')
+  typeConfirmPassword('Test@123456')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.get('body', { timeout: 5000 }).then(($body) => {
@@ -1018,9 +1042,9 @@ it('EV-038 | [Negative] Registration fails with invalid email format', () => {
 
   cy.get('input[name="name"]').first().clear().type('Bad Email User')
   cy.get('input[name=\"email\"]').first().clear({ force: true }).type('not-an-email@@', { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Test@123456')
+  typeConfirmPassword('Test@123456')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.get('body', { timeout: 8000 }).then(($body) => {
@@ -1041,9 +1065,9 @@ it('EV-039 | [Negative] Registration fails when password and confirmation do not
 
   cy.get('input[name="name"]').first().clear().type('Mismatch User')
   cy.get('input[name="email"]').first().clear({ force: true }).type(`mismatch_${Date.now()}@mail.com`, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Different@789')
+  typeConfirmPassword('Different@789')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.get('body', { timeout: 8000 }).then(($body) => {
@@ -1064,9 +1088,9 @@ it('EV-040 | [Negative] Registration fails with short password (less than 8 char
 
   cy.get('input[name="name"]').first().clear().type('Short Pass User')
   cy.get('input[name="email"]').first().clear({ force: true }).type(`shortpass_${Date.now()}@mail.com`, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('abc')
-  cy.get('input[name="password_confirmation"]').first().clear().type('abc')
+  typeConfirmPassword('abc')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.get('body', { timeout: 8000 }).then(($body) => {
@@ -1089,7 +1113,7 @@ it('EV-041 | [Positive] GET /email/verify route exists (not 404)', () => {
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify`,
+    url: `${BASE()}/email/verify`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((res) => {
@@ -1105,7 +1129,7 @@ it('EV-042 | [Positive] POST /email/verification-notification route exists (not 
 
   cy.request({
     method: 'POST',
-    url: `${BASE}/email/verification-notification`,
+    url: `${BASE()}/email/verification-notification`,
     auth: AUTH,
     form: true,
     failOnStatusCode: false,
@@ -1120,7 +1144,7 @@ it('EV-042 | [Positive] POST /email/verification-notification route exists (not 
 it('EV-043 | [Positive] GET /email/verify/{id}/{hash} route responds (not 404)', () => {
   cy.request({
     method: 'GET',
-    url: `${BASE}/email/verify/1/somehash`,
+    url: `${BASE()}/email/verify/1/somehash`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -1144,9 +1168,9 @@ it('EV-044 | [Negative] Duplicate email registration shows sign-in or forgot-pas
 
   cy.get('input[name="name"]').first().clear().type('Duplicate CTA Test')
   cy.get('input[name="email"]').first().clear({ force: true }).type(STUDENT.email, { force: true })
-  cy.get('#phone_number').clear().type('1012345678')
+  fillRegisterPhones()
   cy.get('input[name="password"]').first().clear().type('Test@123456')
-  cy.get('input[name="password_confirmation"]').first().clear().type('Test@123456')
+  typeConfirmPassword('Test@123456')
   cy.contains('button[type="submit"]', /register/i).click({ force: true })
 
   cy.get('body', { timeout: 10000 }).then(($body) => {
@@ -1192,7 +1216,7 @@ it('EV-045 | [Negative] Unverified instructor blocked from identity-verification
   identityRoutes.forEach((route) => {
     cy.request({
       method: 'GET',
-      url: `${BASE}${route}`,
+      url: `${BASE()}${route}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,
@@ -1229,7 +1253,7 @@ it('EV-046 | [Positive] Password reset for unverified account completes without 
   // Verify that the fresh user (unverified) can request a password reset without being blocked
   cy.request({
     method: 'GET',
-    url: `${BASE}/forgot-password`,
+    url: `${BASE()}/forgot-password`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -1247,7 +1271,7 @@ it('EV-046 | [Positive] Password reset for unverified account completes without 
   // Check POST /forgot-password accepts the fresh user's email
   cy.request({
     method: 'GET',
-    url: `${BASE}/forgot-password`,
+    url: `${BASE()}/forgot-password`,
     auth: AUTH,
     failOnStatusCode: false,
   }).then((res) => {
@@ -1258,7 +1282,7 @@ it('EV-046 | [Positive] Password reset for unverified account completes without 
     // We use STUDENT email here because we can't know the freshly registered email in .then()
     return cy.request({
       method: 'POST',
-      url: `${BASE}/forgot-password`,
+      url: `${BASE()}/forgot-password`,
       auth: AUTH,
       form: true,
       followRedirect: true,
@@ -1278,7 +1302,7 @@ it('EV-046 | [Positive] Password reset for unverified account completes without 
   // Also verify the /reset-password route exists (needed for the auto-verify step)
   cy.request({
     method: 'GET',
-    url: `${BASE}/reset-password/fake-token`,
+    url: `${BASE()}/reset-password/fake-token`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: false,
@@ -1303,7 +1327,7 @@ it('EV-046 | [Positive] Password reset for unverified account completes without 
 const assertGated = (route) => {
   return cy.request({
     method: 'GET',
-    url: `${BASE}${route}`,
+    url: `${BASE()}${route}`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -1449,7 +1473,7 @@ it('EV-066 | [Negative] Unverified user: Free course enroll → /email/verify', 
   // Discover a real course from the public catalog
   cy.request({
     method: 'GET',
-    url: `${BASE}/courses`,
+    url: `${BASE()}/courses`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -1469,7 +1493,7 @@ it('EV-067 | [Negative] Unverified user: POST free-enroll blocked', () => {
 
   cy.request({
     method: 'POST',
-    url: `${BASE}/enroll`,
+    url: `${BASE()}/enroll`,
     auth: AUTH,
     form: true,
     followRedirect: true,
@@ -1496,7 +1520,7 @@ it('EV-068 | [Negative] Unverified user: Checkout (paid course) → /email/verif
   // Discover course slug then test checkout routes
   cy.request({
     method: 'GET',
-    url: `${BASE}/courses`,
+    url: `${BASE()}/courses`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -1518,7 +1542,7 @@ it('EV-069 | [Positive] Unverified user CAN view course detail page (public — 
 
   cy.request({
     method: 'GET',
-    url: `${BASE}/courses`,
+    url: `${BASE()}/courses`,
     auth: AUTH,
     failOnStatusCode: false,
     followRedirect: true,
@@ -1534,7 +1558,7 @@ it('EV-069 | [Positive] Unverified user CAN view course detail page (public — 
 
     cy.request({
       method: 'GET',
-      url: `${BASE}/courses/${slug}`,
+      url: `${BASE()}/courses/${slug}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,

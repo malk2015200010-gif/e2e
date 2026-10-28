@@ -11,6 +11,7 @@
 import {
   BASE,
   AUTH,
+  basicAuth,
   HYBRID_RE,
   DELIVERY_SELECT,
   COURSE_CARD,
@@ -102,7 +103,7 @@ describe('MEN-2126 — Remove hybrid delivery type', { testIsolation: false }, (
       .first()
       .then(($a) => {
         const href = $a.attr('href') || ''
-        const path = href.replace(BASE, '')
+        const path = href.replace(BASE(), '')
         go(path.startsWith('/') ? path : `/${path}`)
       })
     pageUiText().then((text) => {
@@ -233,8 +234,8 @@ describe('MEN-2126 — Remove hybrid delivery type', { testIsolation: false }, (
 
     cy.request({
       method: 'GET',
-      url: `${BASE}/courses`,
-      auth: AUTH,
+      url: `${BASE()}/courses`,
+      auth: basicAuth(),
       qs: { delivery_type: 'hybrid' },
       failOnStatusCode: false,
     }).then((res) => {
@@ -267,8 +268,8 @@ describe('MEN-2126 — Remove hybrid delivery type', { testIsolation: false }, (
 
     cy.request({
       method: 'GET',
-      url: `${BASE}/dashboard/my-courses`,
-      auth: AUTH,
+      url: `${BASE()}/dashboard/my-courses`,
+      auth: basicAuth(),
       failOnStatusCode: false,
       timeout: 30000,
     }).then((res) => {

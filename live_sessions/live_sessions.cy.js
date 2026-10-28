@@ -6,17 +6,17 @@
  *   MEN-1555   Live Sessions shared between courses
  *
  * MEN-1555 link-list rule (course_ids[] on /live-sessions/create):
- *   Archived, expired, and non-live/hybrid courses are excluded from the instructor link list.
+ *   Archived, expired, and non-live courses are excluded from the instructor link list.
  *   Unpublished courses remain visible to the instructor for linking sessions, but are hidden
  *   from students and other public users.
  */
 
-import { visitWithAuth, loginViaApi } from '../../support/navigation.js'
-import { HTTP_AUTH, ADMIN, INSTRUCTOR, STUDENT, STUDENTS } from '../../support/users.js'
+import { getAppBase, loginViaApi, loginAndVisit, dismissCookieBanner, selectCourseCategory } from '../../support/navigation.js'
+import { basicAuth, ADMIN, INSTRUCTOR, STUDENT, STUDENTS } from '../../support/users.js'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BASE         = 'https://dev.mentoraeg.com'
-const AUTH         = HTTP_AUTH
+const BASE = () => getAppBase()
+const AUTH = () => basicAuth()
 const TS = Date.now()
 
 // Core suite (TC01–TC16)
@@ -35,9 +35,13 @@ const SHARED_SESSION_TITLE  = `MEN1555 Shared Session ${TS}`
 const UNPUBLISHED_SESSION_TITLE = `MEN1555 Unpublished Session ${TS}`
 
 /** UI copy for eligible courses on live-session create form */
-const LINK_LIST_RULE = /Only active, non-expired and non-archived live or hybrid courses are shown/i
+const LINK_LIST_RULE = /Only active, non-expired and non-archived live(?: or hybrid)? courses are shown/i
 
-const STUDENT_2 = STUDENTS[1]
+// STUDENTS[0] (malk…d) is soft-deleted and STUDENTS[1] (malk…q) cannot log in.
+// Use a second account that still authenticates on dev.
+const STUDENT_2 =
+  STUDENTS.find((s) => s.email === 'student5@demo.com') ||
+  STUDENTS.find((s) => s.email === 'studentbuysession@demo.com')
 
 // Core suite state (TC01–TC16)
 let liveCourseId     = null
@@ -55,10 +59,12 @@ let sharedSessionId  = null
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const go = (path, opts = {}) =>
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 90000, ...opts })
+  cy
+    .visit(`${BASE()}${path}`, { auth: AUTH(), failOnStatusCode: false, timeout: 90000, ...opts })
+    .then(() => dismissCookieBanner())
 
 const apiGet = (path) =>
-  cy.request({ method: 'GET', url: `${BASE}${path}`, auth: AUTH, failOnStatusCode: false, followRedirect: true })
+  cy.request({ method: 'GET', url: `${BASE()}${path}`, auth: AUTH(), failOnStatusCode: false, followRedirect: true })
 
 const minutesFromNow = (n) => {
   const d = new Date(Date.now() + n * 60 * 1000)
@@ -141,39 +147,12 @@ const goToCourseLiveSessions = (courseId) => goToLiveSessionsIndex()
 /** Open create form at /dashboard/live-sessions/create (standalone page, not modal). */
 const openCreateLiveSessionForm = (courseId) => {
   expect(courseId, 'courseId required to create live session').to.exist
-  goToLiveSessionsIndex()
-
-  cy.get('body').then(($b) => {
-    const $create = $b
-      .find(
-        'a[href*="/live-sessions/create"], button[data-target="#createMeetingModal"], ' +
-          'button[data-bs-target="#createMeetingModal"], button[data-target="#createLiveSessionModal"]',
-      )
-      .filter(':visible')
-      .first()
-
-    if ($create.length && ($create.is('a') || $create.attr('href'))) {
-      cy.wrap($create).click({ force: true })
-    } else if ($create.length) {
-      cy.wrap($create).click({ force: true })
-    } else {
-      go(LIVE_SESSIONS_CREATE_PATH)
-    }
-  })
-
-  cy.url({ timeout: 20000 }).should('match', /\/live-sessions(\/create)?/)
-
-  // Legacy modal flow (older course pages) — optional
-  cy.get('body').then(($b) => {
-    if ($b.find('#createMeetingModal').length) {
-      cy.get('#createMeetingModal', { timeout: 15000 }).should('be.visible')
-      return
-    }
-    cy.get('#liveSessionForm, #live_topic, #live_schedule, .ls-form', { timeout: 20000 })
-      .filter(':visible')
-      .first()
-      .should('exist')
-  })
+  go(LIVE_SESSIONS_CREATE_PATH)
+  cy.url({ timeout: 20000 }).should('include', '/live-sessions/create')
+  cy.get('#liveSessionForm, #live_topic, #live_schedule, .ls-form', { timeout: 20000 })
+    .filter(':visible')
+    .first()
+    .should('exist')
 }
 
 /** @deprecated alias */
@@ -229,7 +208,7 @@ const selectCourseOnCreateForm = (courseId, courseTitle = null) => {
       return
     }
 
-    cy.log(`WARNING: Course ${courseId} not in linked courses — must be active, non-expired, non-archived live/hybrid`)
+    cy.log(`WARNING: Course ${courseId} not in linked courses — must be active, non-expired, non-archived live`)
   })
 }
 
@@ -272,22 +251,21 @@ const selectCoursesOnCreateForm = (courses = []) => {
 const createLiveCourse = (title, deliveryType = 'Live') => {
   loginInstructorUI()
   go('/dashboard/courses/new')
-  cy.get('#title').clear().type(title)
-  cy.get('textarea').first().clear().type(`Auto ${deliveryType} course — ${title}`)
+  cy.get('#title', { timeout: 25000 }).should('be.visible').clear({ force: true })
+  cy.get('#title').type(title, { force: true })
+  cy.get('#title').should('have.value', title)
+  cy.get('textarea').first().clear({ force: true })
+  cy.get('textarea').first().type(`Auto ${deliveryType} course — ${title}`, { force: true })
   cy.get('select[name="level"]').select('Beginner')
   cy.get('select[name="delivery_type"]').select(deliveryType)
   cy.wait(1000)
-  cy.get('#course_category').select('22', { force: true })
+  selectCourseCategory()
   cy.wait(1500)
-  cy.contains('label', 'Topic').parent().find('.select2-selection').click({ force: true })
-  cy.contains('.select2-results__option', 'Math').click({ force: true })
-  cy.contains('button', /create course/i).click({ force: true })
-  return cy.url({ timeout: 20000 }).then((url) => {
-    const match = url.match(/courses\/(\d+)/)
-    const id = match ? match[1] : null
-    expect(id, `course id for "${title}"`).to.exist
-    return id
-  })
+  cy.contains('label', 'Topic').parent().find('.select2-selection').first().click({ force: true })
+  cy.contains('.select2-results__option', 'Math').first().click({ force: true })
+  cy.contains('button', /create course/i).first().click({ force: true })
+  cy.url({ timeout: 40000 }).should('match', /\/dashboard\/courses\/\d+/)
+  return cy.url().then((url) => url.match(/courses\/(\d+)/)[1])
 }
 
 const PAID_PRICING_IMG = 'img[src*="/assets/images/paid.svg"], img[src*="paid.svg"]'
@@ -635,15 +613,15 @@ const studentAssertSessionOnCourse = (courseId, topic) => {
 /** Student tries to join session (returns status via callback). */
 const studentTryJoinSession = (sessionId, courseId) => {
   const urls = [
-    `${BASE}/dashboard/live-sessions/${sessionId}/start`,
-    `${BASE}/dashboard/courses/${courseId}/live_class/${sessionId}/join`,
+    `${BASE()}/dashboard/live-sessions/${sessionId}/start`,
+    `${BASE()}/dashboard/courses/${courseId}/live_class/${sessionId}/join`,
   ]
   return cy.request({
-    method: 'GET', url: urls[0], auth: AUTH, failOnStatusCode: false, followRedirect: true,
+    method: 'GET', url: urls[0], auth: AUTH(), failOnStatusCode: false, followRedirect: true,
   }).then((res) => {
     if (res.status < 400) return res
     return cy.request({
-      method: 'GET', url: urls[1], auth: AUTH, failOnStatusCode: false, followRedirect: true,
+      method: 'GET', url: urls[1], auth: AUTH(), failOnStatusCode: false, followRedirect: true,
     })
   })
 }
@@ -682,7 +660,84 @@ const clickFormSubmit = (labelPattern = /create zoom meeting|create|save|schedul
   })
 }
 
-const clickCreateSessionSubmit = () => clickFormSubmit(/create zoom meeting|create|save|schedule|meeting|session/i)
+const clickCreateSessionSubmit = () => {
+  cy.get('#liveSessionForm', { timeout: 15000 }).should('exist')
+  cy.get(
+    '#liveSessionForm button[type="submit"], #liveSessionForm button.ls-form__submit, ' +
+      '#liveSessionForm input[type="submit"], button.ls-form__submit',
+  )
+    .filter(':visible')
+    .first()
+    .scrollIntoView()
+    .click({ force: true })
+}
+
+const ZOOM_OVERLAP_RE = /overlaps|cannot host two meetings|choose a different time/i
+
+/** Hours-from-now after the conflicting Zoom meeting in the flash banner. */
+const hoursAheadPastConflict = (pageText, attempt = 1, fallbackBase = 26) => {
+  const m =
+    String(pageText || '').match(/\((\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\)/) ||
+    String(pageText || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/)
+
+  let targetMs
+  if (m) {
+    const dd = m[1].padStart(2, '0')
+    const mm = m[2].padStart(2, '0')
+    const conflictMs = new Date(`${m[3]}-${mm}-${dd}T${m[4].padStart(2, '0')}:${m[5]}:00`).getTime()
+    const jitterMin = (TS % 17) + 8
+    targetMs =
+      conflictMs +
+      (60 + 90) * 60 * 1000 +
+      (attempt - 1) * 4 * 60 * 60 * 1000 +
+      jitterMin * 60 * 1000
+  } else {
+    targetMs = Date.now() + (fallbackBase + attempt * 5) * 60 * 60 * 1000
+  }
+
+  return Math.max(3, (targetMs - Date.now()) / (60 * 60 * 1000))
+}
+
+/** Submit create form; if Zoom overlap banner stays on /create, jump past that meeting and retry. */
+const submitCreateSessionHandlingZoom = (hoursAhead) => {
+  liveSessionId = null
+  cy.intercept('POST', '**/live-sessions').as('createSessionPost')
+
+  const attemptSubmit = (attempt) => {
+    clickCreateSessionSubmit()
+    cy.wait('@createSessionPost', { timeout: 25000 })
+    cy.url({ timeout: 20000 }).then((url) => {
+      if (!String(url).includes('/live-sessions/create')) return
+      cy.get('body', { timeout: 10000 }).should(($b) => {
+        expect(
+          ZOOM_OVERLAP_RE.test($b.text()),
+          'still on create — expected Zoom overlap so the schedule can be retried',
+        ).to.eq(true)
+      })
+      if (attempt >= 6) return
+      cy.get('body').invoke('text').then((text) => {
+        const nextHours = hoursAheadPastConflict(text, attempt, hoursAhead)
+        cy.log(`Zoom overlap attempt ${attempt} — rescheduling +${Number(nextHours).toFixed(2)}h`)
+        setScheduleDate(nextHours)
+        attemptSubmit(attempt + 1)
+      })
+    })
+  }
+
+  attemptSubmit(1)
+}
+
+const parseSessionId = (raw) => {
+  const s = typeof raw === 'string' ? raw : JSON.stringify(raw || '')
+  const m = s.match(/\/live-sessions\/(\d+)/)
+  return m ? m[1] : null
+}
+
+const rememberSessionId = (raw) => {
+  const id = parseSessionId(raw)
+  if (id) liveSessionId = id
+  return id
+}
 
 /** Fill schedule input — works on modal (#createMeetingModal) or edit page (body) */
 const fillScheduleField = (scheduleValue, parentSelector = '') => {
@@ -792,6 +847,40 @@ const fillScheduleOnEdit = (scheduleOrHours = 26) => {
   setScheduleDate(Math.max(hours, 2))
 }
 
+/**
+ * Save edit form. If Zoom overlap flash appears, jump past the conflicting meeting
+ * and retry. Mutates target.schedule to the last time we submitted.
+ */
+const saveSessionEditHandlingZoom = (target) => {
+  const applyHours = (hours) => {
+    target.hours = hours
+    target.schedule = scheduleFromNow(hours)
+    fillScheduleOnEdit(target.schedule)
+  }
+
+  applyHours(Number(target.hours) || 38)
+
+  const attemptSave = (attempt) => {
+    clickSaveSessionEdit()
+    cy.get('body', { timeout: 15000 }).should('exist')
+    cy.wait(1000)
+    cy.get('body').then(($b) => {
+      const text = $b.text() || ''
+      if (!ZOOM_OVERLAP_RE.test(text)) return
+      if (attempt >= 6) {
+        expect(text, 'Zoom overlap still blocking session edit after retries').to.not.match(ZOOM_OVERLAP_RE)
+        return
+      }
+      const nextHours = hoursAheadPastConflict(text, attempt, target.hours)
+      cy.log(`Zoom overlap on edit attempt ${attempt} — +${Number(nextHours).toFixed(2)}h`)
+      applyHours(nextHours)
+      attemptSave(attempt + 1)
+    })
+  }
+
+  attemptSave(1)
+}
+
 /** Set #live_schedule — Mentora format: YYYY-MM-DD HH:mm:ss + bootstrap datetimepicker widget */
 const setScheduleDate = (hoursAhead = 2) => {
   const schedule = scheduleFromNow(hoursAhead)
@@ -888,11 +977,8 @@ const scheduleReflects = (actual, expected) => {
 }
 
 /** Open modal/page, fill form, submit, verify session on list */
-const createLiveMeeting = (topic, hoursAhead = 2, courseLinks = [{ id: liveCourseId, title: COURSE_TITLE }]) => {
+const createLiveMeeting = (topic, hoursAhead = 26, courseLinks = [{ id: liveCourseId, title: COURSE_TITLE }]) => {
   const links = Array.isArray(courseLinks) ? courseLinks : [{ id: courseLinks, title: COURSE_TITLE }]
-
-  cy.intercept('POST', '**/live-sessions**').as('createMeeting')
-  cy.intercept('POST', '**/live_class**').as('createMeetingLegacy')
 
   openCreateLiveSessionForm(links[0]?.id)
 
@@ -902,9 +988,8 @@ const createLiveMeeting = (topic, hoursAhead = 2, courseLinks = [{ id: liveCours
   selectCoursesOnCreateForm(links)
   setScheduleDate(hoursAhead)
 
-  createSessionField(SESSION_TOPIC_INPUT)
-    .clear({ force: true })
-    .type(topic, { force: true })
+  createSessionField(SESSION_TOPIC_INPUT).clear({ force: true })
+  createSessionField(SESSION_TOPIC_INPUT).type(topic, { force: true })
 
   createSessionField(SESSION_DURATION_INPUT).then(($duration) => {
     const current = String($duration.val() || '').trim()
@@ -917,39 +1002,73 @@ const createLiveMeeting = (topic, hoursAhead = 2, courseLinks = [{ id: liveCours
     if ($sel.length) cy.wrap($sel).select('none', { force: true })
   })
 
-  cy.get('body').then(($b) => {
-    const $submit = $b.find('button.ls-form__submit, #liveSessionForm button[type="submit"], button')
-      .filter(':visible')
-      .filter((_, el) => /create zoom meeting|create|save|schedule|meeting|session/i.test(el.textContent || ''))
-      .first()
-    if ($submit.length) {
-      cy.wrap($submit).scrollIntoView().click({ force: true })
-    } else {
-      clickCreateSessionSubmit()
-    }
+  submitCreateSessionHandlingZoom(hoursAhead)
+
+  cy.location('pathname', { timeout: 25000 }).should('not.include', '/live-sessions/create')
+  cy.url().then((href) => rememberSessionId(href))
+
+  cy.get('@createSessionPost.all').then((calls) => {
+    const last = calls && calls.length ? calls[calls.length - 1] : null
+    if (!last) return
+    rememberSessionId(last.response?.headers?.location)
+    rememberSessionId(last.response?.url)
   })
 
-  cy.wait(3000)
-
-  cy.get('body').then(($b) => {
-    if (/required|error|invalid|please/i.test($b.text())) {
-      cy.log(`WARN: validation text on create form: ${$b.text().slice(0, 300)}`)
-    }
-  })
-
-  assertMeetingOnPage(topic)
-  extractSessionIdFromPage(topic)
   cy.then(() => {
-    expect(liveSessionId, `session id for "${topic}"`).to.exist
+    if (liveSessionId) return
+    const courseId = links[0]?.id
+    goToLiveSessionsIndex()
+    cy.contains(/Filter by course/i, { timeout: 15000 }).should('exist')
+    cy.get('select').filter(':visible').first().then(($sel) => {
+      if (courseId && $sel.find(`option[value="${courseId}"]`).length) {
+        cy.wrap($sel).select(String(courseId), { force: true })
+      }
+    })
+    cy.contains('button, a', /^Apply$/i).click({ force: true })
+    cy.wait(2000)
+    cy.get('a[href*="/live-sessions/"]').then(($as) => {
+      const ids = [...$as]
+        .map((a) => (a.getAttribute('href') || '').match(/\/live-sessions\/(\d+)/))
+        .filter(Boolean)
+        .map((m) => m[1])
+      if (ids.length) liveSessionId = ids.sort((a, b) => Number(b) - Number(a))[0]
+    })
+    cy.get('body').then(($b) => {
+      if (liveSessionId) return
+      const $ev = $b.find('.fc-event, .fc-daygrid-event, [class*="fc-event"]')
+      if ($ev.length) cy.wrap($ev.last()).click({ force: true })
+    })
+    cy.url().then((href) => rememberSessionId(href))
+  })
+
+  cy.then(() => {
+    expect(liveSessionId, `session id for "${topic}" after create`).to.exist
+    go(`/dashboard/live-sessions/${liveSessionId}/edit`)
+    cy.get('body', { timeout: 15000 }).should('exist')
+    cy.get('body').then(($b) => {
+      const ok =
+        $b.text().includes(topic) ||
+        String($b.find('#live_topic, input[name*="topic"]').first().val() || '').includes(topic)
+      expect(ok, `edit page for session ${liveSessionId} shows "${topic}"`).to.eq(true)
+    })
     cy.log(`✓ Session created: ${liveSessionId}`)
   })
 }
 
-/** Confirm session topic appears on /dashboard/live-sessions list. */
+/** Confirm session topic appears on /dashboard/live-sessions (list or calendar). */
 const assertMeetingOnPage = (topic, courseId = liveCourseId) => {
+  if (liveSessionId) {
+    go(`/dashboard/live-sessions/${liveSessionId}/edit`)
+    cy.get('body', { timeout: 15000 }).should(($b) => {
+      const text = $b.text()
+      const val = String($b.find('#live_topic, input[name*="topic"]').first().val() || '')
+      expect(text.includes(topic) || val.includes(topic), `session "${topic}" on edit page`).to.eq(true)
+    })
+    return
+  }
+
   goToLiveSessionsIndex()
-  cy.get('body', { timeout: 15000 }).invoke('text').should('include', topic)
-  cy.log(`Meeting "${topic}" visible on ${LIVE_SESSIONS_PATH}`)
+  cy.contains(topic, { timeout: 20000 }).should('exist')
 }
 
 const extractSessionIdFromPage = (topic = null) => {
@@ -992,16 +1111,7 @@ const extractSessionIdFromPage = (topic = null) => {
   })
 }
 
-const loginInstructorUI = () => {
-  cy.clearCookies()
-  cy.clearLocalStorage()
-  visitWithAuth('login')
-  cy.get('input[type="email"]:visible', { timeout: 10000 }).clear().type(INSTRUCTOR.email)
-  cy.get('input[id="password"]:visible').clear().type(INSTRUCTOR.password)
-  cy.get('button.btn.btn-primary').click({ force: true })
-  cy.url({ timeout: 20000 }).should('include', '/dashboard')
-  cy.log('✓ Instructor logged in')
-}
+const loginInstructorUI = () => loginAndVisit(INSTRUCTOR, '/dashboard')
 
 const pickAdminCourseStatusOption = (opts, statusValue) => {
   const val = String(statusValue)
@@ -1012,8 +1122,9 @@ const pickAdminCourseStatusOption = (opts, statusValue) => {
       || opts.find((o) => /publish|active|approved/i.test(o.text) && !/unpublish|draft|archive|inactive|pending/i.test(o.text))
   }
   if (val === '0') {
-    return byVal('0')
-      || opts.find((o) => /unpublish|draft|inactive|pending|rejected/i.test(o.text) && !/publish|active|archive|approved/i.test(o.text))
+    return opts.find((o) => /\bunpublish\b/i.test(o.text))
+      || byVal('4')
+      || byVal('0')
   }
   if (val === '2') {
     return byVal('2')
@@ -1026,32 +1137,12 @@ const pickAdminCourseStatusOption = (opts, statusValue) => {
 const adminBulkSetCourseStatus = (courseId, title = COURSE_TITLE, statusValue = '1') => {
   cy.log(`Admin setting course ${courseId} status → ${statusValue}`)
   loginViaApi(ADMIN)
-  go('/admin/courses')
+  const query = title ? `?q=${encodeURIComponent(title)}` : ''
+  go(`/admin/courses${query}`)
   cy.get('body', { timeout: 15000 }).should('exist')
 
-  cy.get('body').then(($b) => {
-    const searchInput = $b.find(
-      'input[name="search"], input[type="search"], input[name="q"], input[name="title"]'
-    ).first()
-    if (searchInput.length && title) {
-      cy.wrap(searchInput).clear().type(title)
-      cy.wait(300)
-      const searchBtn = $b.find('button[type="submit"], button:contains("Search")').first()
-      if (searchBtn.length) cy.wrap(searchBtn).click({ force: true })
-      cy.wait(800)
-    }
-  })
-
-  cy.get('body').then(($b) => {
-    const checkbox = $b.find(`input.check_bulk_item[name="bulk_ids[]"][value="${courseId}"]`)
-    if (checkbox.length) {
-      cy.wrap(checkbox.first()).check({ force: true })
-    } else if (title) {
-      cy.contains('tr', title, { timeout: 15000 }).within(() => {
-        cy.get('input.check_bulk_item[name="bulk_ids[]"]').check({ force: true })
-      })
-    }
-  })
+  cy.get(`input.check_bulk_item[name="bulk_ids[]"][value="${courseId}"]`, { timeout: 20000 })
+    .check({ force: true })
 
   cy.get('select[name="status"]', { timeout: 10000 }).then(($sel) => {
     const opts = $sel.find('option').toArray().map((o) => ({ val: o.value, text: (o.textContent || '').trim() }))
@@ -1060,12 +1151,8 @@ const adminBulkSetCourseStatus = (courseId, title = COURSE_TITLE, statusValue = 
     cy.wrap($sel).select(match.val, { force: true })
   })
 
-  cy.get('body').then(($b) => {
-    const updateBtn = $b.find('button:contains("Update"), input[type="submit"][value="Update"]').first()
-    if (updateBtn.length) cy.wrap(updateBtn).scrollIntoView().click({ force: true })
-    else cy.contains('button', /update/i).scrollIntoView().click({ force: true })
-  })
-  cy.wait(1500)
+  cy.get('button[name="bulk_action_btn"][value="update_status"]').click({ force: true })
+  cy.contains(/bulk actions completed successfully/i, { timeout: 20000 }).should('be.visible')
 }
 
 /** Admin unpublish — sets course to draft/inactive via bulk status. */
@@ -1139,6 +1226,8 @@ const submitCourseForReview = (courseId) => {
 describe('Live Session Management — TC01–TC16', () => {
 
   before(() => {
+    cy.on('uncaught:exception', () => false)
+
     createLiveCourse(CORE_COURSE_TITLE).then((id) => { liveCourseId = id })
 
     cy.then(() => {
@@ -1149,9 +1238,7 @@ describe('Live Session Management — TC01–TC16', () => {
     cy.then(() => {
       if (!liveCourseId) return
       loginInstructorUI()
-      createLiveMeeting(CORE_SESSION_TITLE, 2, liveCourseId)
-      assertMeetingOnPage(CORE_SESSION_TITLE, liveCourseId)
-      extractSessionIdFromPage(CORE_SESSION_TITLE)
+      createLiveMeeting(CORE_SESSION_TITLE, 26, liveCourseId)
       cy.then(() => {
         expect(liveSessionId, 'liveSessionId must be set').to.exist
         cy.log(`Core setup — course:${liveCourseId} session:${liveSessionId}`)
@@ -1162,9 +1249,9 @@ describe('Live Session Management — TC01–TC16', () => {
   it('TC01 | [Positive] Instructor creates a live session — appears in sessions list', () => {
     loginInstructorUI()
     cy.then(() => {
-      if (!liveCourseId) return
-      goToLiveSessionsIndex()
-      cy.get('body', { timeout: 10000 }).invoke('text').should('include', CORE_SESSION_TITLE)
+      expect(liveCourseId, 'liveCourseId').to.exist
+      expect(liveSessionId, 'liveSessionId').to.exist
+      assertMeetingOnPage(CORE_SESSION_TITLE, liveCourseId)
     })
   })
 
@@ -1173,7 +1260,7 @@ describe('Live Session Management — TC01–TC16', () => {
     cy.then(() => {
       if (!liveCourseId) return
       const secondTitle = `Second Session ${Date.now()}`
-      createLiveMeeting(secondTitle, 5, liveCourseId)
+      createLiveMeeting(secondTitle, 50, liveCourseId)
       assertMeetingOnPage(secondTitle, liveCourseId)
     })
   })
@@ -1183,23 +1270,20 @@ describe('Live Session Management — TC01–TC16', () => {
     cy.then(() => {
       if (!liveCourseId || !liveSessionId) return
 
-      // Must be ≥2h from now — use +26h (~next day) to satisfy validation
-      const updatedSchedule = scheduleFromNow(26)
+      // Avoid +26h (this session) and +50h (TC02). Zoom rejects two meetings at once.
+      const target = { hours: 38 + (TS % 7) }
 
       openMeetingForEdit(liveCourseId, liveSessionId, CORE_SESSION_TITLE)
       readScheduleValue().then((scheduleBefore) => {
-        fillScheduleOnEdit(updatedSchedule)
-        clickSaveSessionEdit()
-        cy.wait(2000)
-
+        saveSessionEditHandlingZoom(target)
         go(`/dashboard/live-sessions/${liveSessionId}/edit`)
         cy.get('#live_schedule', { timeout: 15000 }).should('be.visible')
         readScheduleValue().then((scheduleAfter) => {
           expect(String(scheduleAfter).trim(), 'schedule after save').to.match(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/)
           expect(String(scheduleAfter).trim(), 'schedule must change').to.not.equal(String(scheduleBefore).trim())
           expect(
-            scheduleReflects(scheduleAfter, updatedSchedule),
-            `saved schedule should reflect ${updatedSchedule.picker}`,
+            scheduleReflects(scheduleAfter, target.schedule),
+            `saved schedule should reflect ${target.schedule.picker}`,
           ).to.be.true
         })
       })
@@ -1246,14 +1330,14 @@ describe('Live Session Management — TC01–TC16', () => {
       if (!liveSessionId || !liveCourseId) return
       cy.request({
         method: 'GET',
-        url: `${BASE}/dashboard/live-sessions/${liveSessionId}/start`,
-        auth: AUTH, failOnStatusCode: false, followRedirect: true,
+        url: `${BASE()}/dashboard/live-sessions/${liveSessionId}/start`,
+        auth: AUTH(), failOnStatusCode: false, followRedirect: true,
       }).then((res) => {
         if (res.status >= 400) {
           return cy.request({
             method: 'GET',
-            url: `${BASE}/dashboard/courses/${liveCourseId}/live_class/${liveSessionId}/join`,
-            auth: AUTH, failOnStatusCode: false, followRedirect: true,
+            url: `${BASE()}/dashboard/courses/${liveCourseId}/live_class/${liveSessionId}/join`,
+            auth: AUTH(), failOnStatusCode: false, followRedirect: true,
           })
         }
         return cy.wrap(res)
@@ -1314,8 +1398,8 @@ describe('Live Session Management — TC01–TC16', () => {
       if (!liveSessionId) return
       cy.request({
         method: 'PUT',
-        url: `${BASE}/dashboard/live-sessions/${liveSessionId}`,
-        auth: AUTH, form: true, followRedirect: false, failOnStatusCode: false,
+        url: `${BASE()}/dashboard/live-sessions/${liveSessionId}`,
+        auth: AUTH(), form: true, followRedirect: false, failOnStatusCode: false,
         body: { _method: 'PUT', title: 'Edited After Start', starts_at: minutesFromNow(-30) },
       }).then((res) => {
         const blocked = res.status === 403 || res.status === 422 ||
@@ -1334,7 +1418,7 @@ describe('Live Session Management — TC01–TC16', () => {
         `/dashboard/live-sessions/${liveSessionId}/edit`,
         `/dashboard/courses/${liveCourseId}/live_class/${liveSessionId}/join`,
       ].forEach((route) => {
-        cy.request({ method: 'GET', url: `${BASE}${route}`, auth: AUTH, failOnStatusCode: false, followRedirect: true })
+        cy.request({ method: 'GET', url: `${BASE()}${route}`, auth: AUTH(), failOnStatusCode: false, followRedirect: true })
           .then((res) => cy.log(`Non-enrolled ${route} → ${res.status}`))
       })
     })
@@ -1346,8 +1430,8 @@ describe('Live Session Management — TC01–TC16', () => {
       if (!liveSessionId) return
       cy.request({
         method: 'GET',
-        url: `${BASE}/dashboard/live-sessions/${liveSessionId}/start`,
-        auth: AUTH, failOnStatusCode: false, followRedirect: true,
+        url: `${BASE()}/dashboard/live-sessions/${liveSessionId}/start`,
+        auth: AUTH(), failOnStatusCode: false, followRedirect: true,
       }).then((res) => cy.log(`Early join → ${res.status}`))
     })
   })
@@ -1358,8 +1442,8 @@ describe('Live Session Management — TC01–TC16', () => {
       if (!liveSessionId) return
       cy.request({
         method: 'GET',
-        url: `${BASE}/dashboard/live-sessions/${liveSessionId}/start`,
-        auth: AUTH, failOnStatusCode: false, followRedirect: true,
+        url: `${BASE()}/dashboard/live-sessions/${liveSessionId}/start`,
+        auth: AUTH(), failOnStatusCode: false, followRedirect: true,
       }).then((res) => cy.log(`Join ended → ${res.status}`))
     })
   })
@@ -1371,8 +1455,8 @@ describe('Live Session Management — TC01–TC16', () => {
       if (!liveSessionId || !liveCourseId) return
       cy.request({
         method: 'GET',
-        url: `${BASE}/dashboard/live-sessions/${liveSessionId}/start`,
-        auth: AUTH, failOnStatusCode: false, followRedirect: true,
+        url: `${BASE()}/dashboard/live-sessions/${liveSessionId}/start`,
+        auth: AUTH(), failOnStatusCode: false, followRedirect: true,
       }).then((res) => {
         const blocked = res.status === 401 || res.status === 403 ||
           (res.redirects || []).some((r) => r.includes('/login'))
@@ -1390,8 +1474,8 @@ describe('Live Session Management — TC01–TC16', () => {
       }
       cy.request({
         method: 'GET',
-        url: `${BASE}/dashboard/live-sessions/${deletedSessionId}/edit`,
-        auth: AUTH, failOnStatusCode: false, followRedirect: true,
+        url: `${BASE()}/dashboard/live-sessions/${deletedSessionId}/edit`,
+        auth: AUTH(), failOnStatusCode: false, followRedirect: true,
       }).then((res) => cy.log(`Deleted session → ${res.status}`))
     })
   })
@@ -1439,7 +1523,7 @@ describe('MEN-1555 — Live Sessions shared between courses', () => {
     cy.then(() => {
       if (!courseAId || !courseBId) return
       loginInstructorUI()
-      createLiveMeeting(SHARED_SESSION_TITLE, 3, [
+      createLiveMeeting(SHARED_SESSION_TITLE, 74, [
         { id: courseAId, title: COURSE_A_TITLE },
         { id: courseBId, title: COURSE_B_TITLE },
       ])
@@ -1468,9 +1552,8 @@ describe('MEN-1555 — Live Sessions shared between courses', () => {
       expect(courseAId).to.exist
       expect(courseBId).to.exist
       expect(sharedSessionId).to.exist
-
-      goToLiveSessionsIndex()
-      cy.get('body').invoke('text').should('include', SHARED_SESSION_TITLE)
+      liveSessionId = sharedSessionId
+      assertMeetingOnPage(SHARED_SESSION_TITLE, courseAId)
 
       openCreateLiveSessionForm(courseAId)
       assertLinkListRuleVisible()
@@ -1503,7 +1586,7 @@ describe('MEN-1555 — Live Sessions shared between courses', () => {
       openCreateLiveSessionForm(courseAId)
       assertCourseInLinkList(unpublishedCourseId, true, 'unpublished — instructor may link sessions')
 
-      createLiveMeeting(UNPUBLISHED_SESSION_TITLE, 3, [
+      createLiveMeeting(UNPUBLISHED_SESSION_TITLE, 98, [
         { id: unpublishedCourseId, title: UNPUBLISHED_COURSE_TITLE },
       ])
       goToLiveSessionsIndex()
@@ -1522,7 +1605,7 @@ describe('MEN-1555 — Live Sessions shared between courses', () => {
 
       openCreateLiveSessionForm(courseAId)
       assertLinkListRuleVisible()
-      assertCourseInLinkList(recordedCourseId, false, 'recorded delivery — only live/hybrid allowed')
+      assertCourseInLinkList(recordedCourseId, false, 'recorded delivery — only live courses allowed')
     })
   })
 

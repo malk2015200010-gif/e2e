@@ -1,344 +1,131 @@
-import { visitWithAuth } from '../../support/navigation'
-import { INSTRUCTOR } from '../../support/users'
+import { getAppBase, loginAndVisit } from '../../support/navigation'
+import { HTTP_AUTH, INSTRUCTOR } from '../../support/users'
+
+const exposed = (key) => {
+  try {
+    return String(Cypress.expose(key) || '')
+  } catch (_) {
+    return ''
+  }
+}
+
+const instructorAccount = () => {
+  const email = exposed('instructor_email')
+  const password = exposed('instructor_password')
+  if (email && password) return { email, password }
+  return INSTRUCTOR
+}
+
+const openPath = (hrefSuffix) => {
+  cy.get(`a[href$="${hrefSuffix}"]`, { timeout: 20000 }).first().then(($a) => {
+    const path = new URL($a.attr('href'), getAppBase()).pathname
+    cy.visit(path, {
+      auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
+      failOnStatusCode: false,
+      timeout: 120000,
+    })
+  })
+  cy.location('pathname', { timeout: 20000 }).should('include', hrefSuffix)
+}
+
+const logout = () => {
+  cy.get('a[href$="/logout"]', { timeout: 20000 }).invoke('attr', 'href').then((href) => {
+    cy.request({
+      url: href,
+      auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
+      followRedirect: false,
+      failOnStatusCode: false,
+    }).its('headers.location').should('include', '/login')
+  })
+}
 
 describe('Instructor Account Page Navigation', () => {
-
   beforeEach(() => {
-
-    // Clear old session
-    cy.clearCookies()
-    cy.clearLocalStorage()
-
-    // Login
-    visitWithAuth('login')
-
-    cy.get('input[type="email"]:visible')
-      .clear()
-      .type(INSTRUCTOR.email)
-
-    cy.get('#password')
-      .clear()
-      .type(INSTRUCTOR.password)
-
-    cy.get('button.btn.btn-primary')
-      .click({ force: true })
-
-    // Dashboard loaded
+    loginAndVisit(instructorAccount(), '/dashboard')
     cy.url().should('include', '/dashboard')
-
   })
-
-  // =====================================
-  // Dashboard
-  // =====================================
 
   it('Open Dashboard page', () => {
-
-    cy.contains(/dashboard/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/dashboard')
-
-    cy.contains(/create new course/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/courses/new')
-
-    cy.contains(/my courses/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/my-courses')
-
-    cy.contains(/earnings/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/earning')
-
-    cy.contains(/withdraw/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/withdraw')
-
-    cy.contains(/my courses reviews/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/my-courses-reviews')
-
-     cy.get('a[href*="courses-has-quiz"]')
-    .first()
-    .click({ force: true })
-
-    cy.url().should('include', '/courses-has-quiz')
-
-    cy.contains(/assignments/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/assignments')
-
-    cy.contains(/discussions/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/discussions')
-
-     cy.contains(/enrolled courses/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/enrolled')
-
-     cy.contains(/my instalments/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/my-instalments')
-
-     cy.contains(/wishlist/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/wishlist')
-
-     cy.get('a[href*="reviews-i-wrote"]')
-       .first()
-       .click({ force: true })
-
-    cy.url().should('include', '/reviews-i-wrote')
-
-     cy.get('a[href*="my-quiz-attempts"]')
-       .first()
-       .click({ force: true })
-
-    cy.url().should('include', '/my-quiz-attempts')
-
-     cy.contains(/purchase history/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/purchases')
-
-     cy.contains(/settings/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/settings')
-
-     cy.contains(/log out/i)
-      .click({ force: true })
-
-    cy.url().then((url) => { cy.log('Post-logout URL: ' + url); expect(url).to.satisfy((u) => u.includes('/login') || !u.includes('/dashboard')) })
-
+    openPath('/dashboard')
+    openPath('/dashboard/courses/new')
+    openPath('/dashboard/my-courses')
+    openPath('/dashboard/earning')
+    openPath('/dashboard/withdraw')
+    openPath('/dashboard/my-courses-reviews')
+    openPath('/dashboard/courses-has-quiz')
+    openPath('/dashboard/assignments')
+    openPath('/dashboard/discussions')
+    openPath('/dashboard/enrolled-courses')
+    openPath('/my-instalments')
+    openPath('/dashboard/wishlist')
+    openPath('/dashboard/reviews-i-wrote')
+    openPath('/dashboard/my-quiz-attempts')
+    openPath('/dashboard/purchases')
+    openPath('/dashboard/settings')
+    logout()
   })
-
-  // =====================================
-  // Create New Course
-  // =====================================
 
   it('Open Create New Course page', () => {
-
-    cy.contains(/create new course/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/courses/new')
-
-
-
+    openPath('/dashboard/courses/new')
   })
-
-  // =====================================
-  // My Courses
-  // =====================================
 
   it('Open My Courses page', () => {
-
-    cy.contains(/my courses/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/my-courses')
-
+    openPath('/dashboard/my-courses')
   })
-
-  // =====================================
-  // Earnings
-  // =====================================
 
   it('Open Earnings page', () => {
-
-    cy.contains(/earnings/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/earning')
-
+    openPath('/dashboard/earning')
   })
-
-  // =====================================
-  // Withdraw
-  // =====================================
 
   it('Open Withdraw page', () => {
-
-    cy.contains(/withdraw/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/withdraw')
-
+    openPath('/dashboard/withdraw')
   })
-
-  // =====================================
-  // My Courses Reviews
-  // =====================================
 
   it('Open My Courses Reviews page', () => {
-
-    cy.contains(/my courses reviews/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/my-courses-reviews')
-
+    openPath('/dashboard/my-courses-reviews')
   })
-
-  // =====================================
-  // Quiz Attempts
-  // =====================================
 
   it('Open Quiz Attempts page', () => {
-
-    cy.get('a[href*="courses-has-quiz"]')
-    .first()
-    .click({ force: true })
-
-    cy.url().should('include', '/courses-has-quiz')
-
+    openPath('/dashboard/courses-has-quiz')
   })
-
-  // =====================================
-  // Assignments
-  // =====================================
 
   it('Open Assignments page', () => {
-
-    cy.contains(/assignments/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/assignments')
-
+    openPath('/dashboard/assignments')
   })
-
-  // =====================================
-  // Discussions
-  // =====================================
 
   it('Open Discussions page', () => {
-
-    cy.contains(/discussions/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/discussions')
-
+    openPath('/dashboard/discussions')
   })
-
-  // =====================================
-  // Enrolled Courses
-  // =====================================
 
   it('Open Enrolled Courses page', () => {
-
-    cy.contains(/enrolled courses/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/enrolled')
-
+    openPath('/dashboard/enrolled-courses')
   })
-
-  // =====================================
-  // My Instalments
-  // =====================================
 
   it('Open My Instalments page', () => {
-
-    cy.contains(/my instalments/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/my-instalments')
-
+    openPath('/my-instalments')
   })
-
-  // =====================================
-  // Wishlist
-  // =====================================
 
   it('Open Wishlist page', () => {
-
-    cy.contains(/wishlist/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/wishlist')
-
+    openPath('/dashboard/wishlist')
   })
-
-  // =====================================
-  // Reviews
-  // =====================================
 
   it('Open Reviews page', () => {
-
-  cy.get('a[href*="reviews-i-wrote"]')
-  .first()
-  .click({ force: true })
-
-
-  cy.url().should('include', '/reviews-i-wrote')
-
-})
-
-  // =====================================
-  // My Quiz Attempts
-  // =====================================
+    openPath('/dashboard/reviews-i-wrote')
+  })
 
   it('Open My Quiz Attempts page', () => {
-
-    
-  cy.get('a[href*="my-quiz-attempts"]')
-    .first()
-    .click({ force: true })
-
-  cy.url().should('include', '/my-quiz-attempts')
-
-})
-
-  
-
-  // =====================================
-  // Purchase History
-  // =====================================
+    openPath('/dashboard/my-quiz-attempts')
+  })
 
   it('Open Purchase History page', () => {
-
-    cy.contains(/purchase history/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/purchase')
-
+    openPath('/dashboard/purchases')
   })
-
-  // =====================================
-  // Settings
-  // =====================================
 
   it('Open Settings page', () => {
-
-    cy.contains(/settings/i)
-      .click({ force: true })
-
-    cy.url().should('include', '/settings')
-
+    openPath('/dashboard/settings')
   })
-
-  // =====================================
-  // Logout
-  // =====================================
 
   it('Logout successfully', () => {
-
-    cy.contains(/log out/i)
-      .click({ force: true })
-
-    cy.url().then((url) => { cy.log('Post-logout URL: ' + url); expect(url).to.satisfy((u) => u.includes('/login') || !u.includes('/dashboard')) })
-
+    logout()
   })
-
 })

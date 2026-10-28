@@ -68,7 +68,7 @@ function loginStaff() {
 }
 
 function goToEventsAdmin() {
-  cy.visit('https://dev.mentoraeg.com/admin/events', {
+  cy.visit('/admin/events', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -84,7 +84,7 @@ function openCreateEventForm() {
     if (createBtn.length) {
       cy.wrap(createBtn).click({ force: true })
     } else {
-      cy.visit('https://dev.mentoraeg.com/admin/events/create', {
+      cy.visit('/admin/events/create', {
         auth: HTTP_AUTH,
         failOnStatusCode: false,
         timeout: 60000,
@@ -337,7 +337,7 @@ it('MEN-1444 | Admin can view invite list with status, voucher code, and timesta
       cy.log(`Invite status visible in row: ${hasStatus}`)
       cy.get('body').should('not.contain.text', 'Error 500')
     } else {
-      cy.visit('https://dev.mentoraeg.com/admin/events', {
+      cy.visit('/admin/events', {
         auth: HTTP_AUTH,
         failOnStatusCode: false,
         timeout: 60000,
@@ -395,7 +395,7 @@ it('MEN-1446 | Guest can register via invite link when phone matches the invite'
     body: { success: true },
   }).as('guestRegister')
 
-  cy.visit(`https://dev.mentoraeg.com/register?invite=${inviteToken}`, {
+  cy.visit(`/register?invite=${inviteToken}`, {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -440,7 +440,7 @@ it('MEN-1447 | Guest registration is rejected when phone does not match invite p
     },
   }).as('phoneMismatch')
 
-  cy.visit(`https://dev.mentoraeg.com/register?invite=${inviteToken}`, {
+  cy.visit(`/register?invite=${inviteToken}`, {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -493,7 +493,7 @@ it('MEN-1448 | System queues QR WhatsApp delivery after guest successfully regis
     },
   }).as('registrationSuccess')
 
-  cy.visit(`https://dev.mentoraeg.com/register?invite=valid-token`, {
+  cy.visit(`/register?invite=valid-token`, {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -518,7 +518,7 @@ it('MEN-1448 | System queues QR WhatsApp delivery after guest successfully regis
 it('MEN-1449 | Guest sees event voucher in My Vouchers with "pending check-in" state', () => {
   loginGuest()
 
-  cy.visit('https://dev.mentoraeg.com/dashboard/vouchers', {
+  cy.visit('/dashboard/vouchers', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -547,7 +547,7 @@ it('MEN-1450 | Guest cannot apply pending_activation voucher at checkout before 
 
   loginGuest()
 
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -596,7 +596,7 @@ it('MEN-1451 | Guest can apply event voucher at checkout after staff check-in ac
 
   loginGuest()
 
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -649,7 +649,7 @@ it('MEN-1452 | Staff check-in scan activates the guest voucher (pending_activati
 
   loginStaff()
 
-  cy.visit(`https://dev.mentoraeg.com/e/check-in/${checkInToken}`, {
+  cy.visit(`/e/check-in/${checkInToken}`, {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -695,7 +695,7 @@ it('MEN-1453 | Scanning QR a second time returns idempotent "already checked in"
 
   loginStaff()
 
-  cy.visit(`https://dev.mentoraeg.com/e/check-in/${checkInToken}`, {
+  cy.visit(`/e/check-in/${checkInToken}`, {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -802,7 +802,7 @@ it('MEN-1455 | Event voucher cannot be redeemed in a second cart while payment i
 
   loginGuest(ALT_GUEST)
 
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,

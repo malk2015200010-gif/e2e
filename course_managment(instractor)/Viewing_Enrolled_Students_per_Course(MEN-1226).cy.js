@@ -1,12 +1,77 @@
 /// <reference types="cypress" />
 
 import { visitWithAuth, loginViaApi } from '../../support/navigation'
-import { ADMIN, INSTRUCTOR } from '../../support/users'
+import { ADMIN, INSTRUCTOR, basicAuth } from '../../support/users'
 
 describe('Course Enrolled Students Roster', () => {
 
   const instructor = INSTRUCTOR
   const admin = ADMIN
+
+  function openMyCourses() {
+    cy.get('a[href*="/dashboard/my-courses"]').first().click({ force: true })
+    cy.url().should('include', '/dashboard/my-courses')
+  }
+
+  /**
+   * First "Enrolled students" link on my-courses is often an empty auto-course
+   * (no table / no Phone column). Probe enrollment URLs until a roster with rows exists.
+   */
+  function openFirstRosterWithStudents() {
+    openMyCourses()
+    cy.get('a[href*="/dashboard/courses/"][href*="/enrollments"]', { timeout: 20000 }).then(($links) => {
+      const hrefs = [...new Set([...$links].map((a) => a.href).filter(Boolean))]
+      expect(hrefs.length, 'instructor enrollment links').to.be.greaterThan(0)
+
+      const tryHref = (i) => {
+        if (i >= Math.min(hrefs.length, 40)) {
+          throw new Error('No enrolled-students roster with rows in the first 40 courses')
+        }
+        cy.request({
+          url: hrefs[i],
+          auth: basicAuth(),
+          failOnStatusCode: false,
+          timeout: 60000,
+        }).then((res) => {
+          const html = String(res.body || '')
+          const hasRoster =
+            /<th>\s*Phone\s*<\/th>/i.test(html) &&
+            /Access status/i.test(html) &&
+            !/No enrolled students/i.test(html)
+          if (!hasRoster) {
+            tryHref(i + 1)
+            return
+          }
+          cy.visit(hrefs[i], {
+            auth: basicAuth(),
+            failOnStatusCode: false,
+            timeout: 120000,
+          })
+          cy.url().should('include', '/enrollments')
+          cy.contains('th', /phone/i, { timeout: 20000 }).should('exist')
+        })
+      }
+      tryHref(0)
+    })
+  }
+
+  function rosterRows() {
+    // Desktop table is `.d-none.d-md-block` — Cypress AUT iframe is often < 768px,
+    // so the table exists but is not :visible. Mobile cards (`.d-md-none`) then show.
+    return cy.get(
+      'table.table-bordered tbody tr, .table-responsive table tbody tr, .d-md-none .border.bg-white',
+      { timeout: 20000 },
+    )
+  }
+
+  function visibleRosterItems() {
+    return cy.get('body', { timeout: 20000 }).should(($body) => {
+      const n = $body.find(
+        'table.table-bordered tbody tr:visible, .table-responsive table tbody tr:visible, .d-md-none .border.bg-white:visible',
+      ).length
+      expect(n, 'visible roster table rows or mobile cards').to.be.greaterThan(0)
+    })
+  }
 
   // =========================================
   // Instructor Login
@@ -53,11 +118,7 @@ describe('Course Enrolled Students Roster', () => {
 
     loginInstructor()
 
-  cy.get('a[href="https://dev.mentoraeg.com/dashboard/my-courses"]')
-  .first()
-  .click({ force: true })
-
-cy.url().should('include', '/dashboard/my-courses')
+    openMyCourses()
   })
 
   // =========================================
@@ -67,21 +128,12 @@ cy.url().should('include', '/dashboard/my-courses')
   it('TC2 - instructor sees required columns', () => {
 
     loginInstructor()
+    openFirstRosterWithStudents()
 
-    cy.get('a[href="https://dev.mentoraeg.com/dashboard/my-courses"]')
-  .first()
-  .click({ force: true })
-
-   cy.url().should('include', '/dashboard/my-courses')
-
-    cy.contains(/enrolled students/i)
-      .first()
-      .click({ force: true })
-
-    cy.contains(/name/i).should('exist')
-    cy.contains(/phone/i).should('exist')
-    cy.contains(/status/i).should('exist')
-    cy.contains(/payment/i).should('exist')
+    cy.contains('th', /student|name/i).should('exist')
+    cy.contains('th', /phone/i).should('exist')
+    cy.contains('th', /status/i).should('exist')
+    cy.contains('th', /payment/i).should('exist')
 
   })
 
@@ -92,17 +144,7 @@ cy.url().should('include', '/dashboard/my-courses')
   it('TC3 - instructor cannot see student email', () => {
 
     loginInstructor()
-
-    cy.get('a[href="https://dev.mentoraeg.com/dashboard/my-courses"]')
-  .first()
-  .click({ force: true })
-
-   cy.url().should('include', '/dashboard/my-courses')
-
-
-    cy.contains(/enrolled students/i)
-      .first()
-      .click({ force: true })
+    openFirstRosterWithStudents()
 
     cy.get('[data-cy="student-email"]')
       .should('not.exist')
@@ -115,27 +157,14 @@ cy.url().should('include', '/dashboard/my-courses')
   it('TC4 - enrollment status column displays correctly', () => {
 
     loginInstructor()
+    openFirstRosterWithStudents()
 
-    cy.get('a[href="https://dev.mentoraeg.com/dashboard/my-courses"]')
-      .first()
-      .click({ force: true })
+    rosterRows().should('have.length.greaterThan', 0)
+    visibleRosterItems()
 
-    cy.url().should('include', '/dashboard/my-courses')
+    cy.contains('th', /status/i).should('exist')
 
-    cy.contains(/enrolled students/i)
-      .first()
-      .click({ force: true })
-
-    // Wait for roster to load
-    cy.get('table tbody tr, [data-cy="enrollment-row"]', { timeout: 5000 })
-      .should('have.length.greaterThan', 0)
-
-    // Verify status column header exists
-    cy.contains(/status/i)
-      .should('exist')
-
-    // Verify at least one row contains a visible status (Active, Success, Pending, etc.)
-    cy.get('table tbody tr, [data-cy="enrollment-row"]')
+    rosterRows()
       .first()
       .invoke('text')
       .should('match', /active|success|pending|inactive/i)
@@ -151,21 +180,10 @@ cy.url().should('include', '/dashboard/my-courses')
     cy.viewport('iphone-x')
 
     loginInstructor()
+    openFirstRosterWithStudents()
 
-    cy.get('a[href="https://dev.mentoraeg.com/dashboard/my-courses"]')
-  .first()
-  .click({ force: true })
-
-   cy.url().should('include', '/dashboard/my-courses')
-        
-
-    cy.contains(/enrolled students/i)
-      .first()
-      .click({ force: true })
-
-    // Verify roster content loads (table or card layout)
-    cy.get('table tbody tr, [data-cy="enrollment-row"], .card', { timeout: 5000 })
-      .should('have.length.greaterThan', 0)
+    rosterRows().should('have.length.greaterThan', 0)
+    visibleRosterItems()
 
   })
 
@@ -182,7 +200,7 @@ cy.url().should('include', '/dashboard/my-courses')
       .should('include', '/dashboard')
 
     // Verify page loaded (no redirect back to login)
-    cy.get('a[href="https://dev.mentoraeg.com/dashboard/my-courses"]')
+    cy.get('a[href*="/dashboard/my-courses"]')
       .should('exist')
 
   })

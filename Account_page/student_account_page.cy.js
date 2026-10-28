@@ -1,25 +1,11 @@
-import { loginViaApi } from '../../support/navigation'
-import { STUDENT, HTTP_AUTH } from '../../support/users'
+import { loginAndVisit } from '../../support/navigation'
+import { STUDENT } from '../../support/users'
 
-const BASE = 'https://dev.mentoraeg.com'
 
 describe('Student Account Page Navigation', () => {
 
   beforeEach(() => {
-
-    // Login via cy.request() — the form-click login redirects students to
-    // the homepage ("/") instead of "/dashboard" on this staging environment,
-    // so we log in via API (proper Laravel session) and then visit /dashboard directly.
-    loginViaApi(STUDENT)
-
-    cy.visit(`${BASE}/dashboard`, {
-      auth: { username: HTTP_AUTH.username, password: HTTP_AUTH.password },
-      failOnStatusCode: false,
-    })
-
-    // Dashboard loaded
-    cy.url({ timeout: 20000 }).should('include', '/dashboard')
-
+    loginAndVisit(STUDENT, '/dashboard')
   })
 
   // =====================================
@@ -40,6 +26,12 @@ describe('Student Account Page Navigation', () => {
       .click({ force: true })
 
     cy.url().should('include', '/enrolled-courses')
+
+    cy.get('a[href*="my-schedule"]')
+      .first()
+      .click({ force: true })
+
+    cy.url().should('include', '/my-schedule')
 
     cy.get('a[href*="my-instalments"]')
       .first()
@@ -100,6 +92,20 @@ describe('Student Account Page Navigation', () => {
       .click({ force: true })
 
     cy.url().should('include', '/enrolled-courses')
+
+  })
+
+  // =====================================
+  // My Schedule
+  // =====================================
+
+  it('Open My Schedule page', () => {
+
+    cy.get('a[href*="my-schedule"]')
+      .first()
+      .click({ force: true })
+
+    cy.url().should('include', '/my-schedule')
 
   })
 

@@ -1,4 +1,4 @@
-import { visitWithAuth } from '../../support/navigation';
+import { getAppBase, visitWithAuth } from '../../support/navigation';
 
 
 
@@ -114,6 +114,6 @@ it('Negative - course details page should open correctly', () => {
 
   cy.get('.course-card').first().click()
 
-  cy.url().should('not.eq', 'https://dev.mentoraeg.com/courses')
+  cy.url().should('not.eq', `${getAppBase()}/courses`)
 
 })

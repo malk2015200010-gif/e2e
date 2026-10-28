@@ -33,7 +33,7 @@ function loginAdmin() {
 }
 
 function goToVouchersPage() {
-  cy.visit('https://dev.mentoraeg.com/admin/vouchers', {
+  cy.visit('/admin/vouchers', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -49,7 +49,7 @@ function openCreateVoucherForm() {
     if (createBtn.length) {
       cy.wrap(createBtn.first()).click({ force: true })
     } else {
-      cy.visit('https://dev.mentoraeg.com/admin/vouchers/create', {
+      cy.visit('/admin/vouchers/create', {
         auth: HTTP_AUTH,
         failOnStatusCode: false,
         timeout: 60000,
@@ -303,7 +303,7 @@ it('MEN-1384 | Admin can bulk generate vouchers (up to 500)', () => {
       cy.log('Bulk voucher generation attempted for 10 vouchers')
     } else {
       cy.log('No bulk generate option found — may be accessed via different route')
-      cy.visit('https://dev.mentoraeg.com/admin/vouchers/bulk', {
+      cy.visit('/admin/vouchers/bulk', {
         auth: HTTP_AUTH,
         failOnStatusCode: false,
         timeout: 60000,
@@ -384,7 +384,7 @@ it('MEN-1386 | Admin can search vouchers by code', () => {
 it('MEN-1410 | Instructor dashboard earnings show gross price (before voucher discount)', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/payments', {
+  cy.visit('/admin/payments', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -408,7 +408,7 @@ it('MEN-1410 | Instructor dashboard earnings show gross price (before voucher di
 it('MEN-1411 | Admin can see the actual amount paid by student (after voucher discount)', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/payments', {
+  cy.visit('/admin/payments', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -476,7 +476,7 @@ it('MEN-1413 | Voucher usage statistics are visible in admin panel', () => {
 it('MEN-1414 | Platform discount cost is displayed in admin reporting', () => {
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/admin/vouchers', {
+  cy.visit('/admin/vouchers', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -576,7 +576,7 @@ it('MEN-1422 | Voucher validation API returns success for valid voucher code', (
   loginAdmin()
   goToVouchersPage()
 
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -617,7 +617,7 @@ it('MEN-1423 | Voucher validation API returns error response for invalid code', 
 
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -657,7 +657,7 @@ it('MEN-1424 | Remove voucher API call succeeds when removing applied voucher', 
 
   loginAdmin()
 
-  cy.visit('https://dev.mentoraeg.com/checkout', {
+  cy.visit('/checkout', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,

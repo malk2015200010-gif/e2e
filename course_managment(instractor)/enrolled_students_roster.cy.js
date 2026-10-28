@@ -44,7 +44,7 @@ function loginInstructor() {
 }
 
 function goToAdminCourses() {
-  cy.visit('https://dev.mentoraeg.com/admin/courses', {
+  cy.visit('/admin/courses', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -199,7 +199,7 @@ it('MEN-1256 | Unauthenticated user cannot access enrolled students roster', () 
   cy.clearCookies()
   cy.clearLocalStorage()
 
-  cy.visit('https://dev.mentoraeg.com/dashboard/my-courses', {
+  cy.visit('/dashboard/my-courses', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -306,7 +306,7 @@ it('MEN-1260 | Student with missing phone number is displayed gracefully in rost
 it('MEN-1261 | Accessing roster for non-existent course returns safe error page', () => {
   login()
 
-  cy.visit('https://dev.mentoraeg.com/admin/courses/99999/students', {
+  cy.visit('/admin/courses/99999/students', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -330,7 +330,7 @@ it('MEN-1262 | URL manipulation attempts return safe responses', () => {
   ]
 
   paths.forEach((path) => {
-    cy.visit(`https://dev.mentoraeg.com/${path}`, {
+    cy.visit(`/${path}`, {
       auth: HTTP_AUTH,
       failOnStatusCode: false,
       timeout: 60000,
@@ -348,7 +348,7 @@ it('MEN-1262 | URL manipulation attempts return safe responses', () => {
 it('MEN-1263 | API returns 401/403 when accessing roster without authentication', () => {
   cy.request({
     method: 'GET',
-    url: 'https://dev.mentoraeg.com/api/courses/1/enrolled-students',
+    url: '/api/courses/1/enrolled-students',
     failOnStatusCode: false,
   }).then((response) => {
     expect(response.status).to.be.oneOf([401, 403, 404, 302])
@@ -396,16 +396,15 @@ it('MEN-1267 | Accessing roster without valid session redirects to login', () =>
   cy.clearCookies()
   cy.clearLocalStorage()
 
-  visitWithAuth('admin/courses')
-
-  cy.url({ timeout: 15000 }).then((url) => {
-    if (url.includes('/login')) {
-      cy.log('Unauthenticated user redirected to login — correct behavior')
-    } else {
-      cy.get('body').should('not.contain.text', 'Error 500')
-      cy.log(`Redirected to: ${url}`)
-    }
+  // Do not use visitWithAuth() — it asserts the URL stays on /admin/courses.
+  // Unauthenticated users are redirected to /login (the behavior this test checks).
+  cy.visit('/admin/courses', {
+    auth: HTTP_AUTH,
+    failOnStatusCode: false,
+    timeout: 120000,
   })
+
+  cy.url({ timeout: 30000 }).should('include', '/login')
 })
 
 // ─────────────────────────────────────────────────────────────
@@ -437,7 +436,7 @@ it('MEN-1269 | Roster page is secure regardless of language/locale parameter', (
   ]
 
   paths.forEach((path) => {
-    cy.visit(`https://dev.mentoraeg.com/${path}`, {
+    cy.visit(`/${path}`, {
       auth: HTTP_AUTH,
       failOnStatusCode: false,
       timeout: 60000,

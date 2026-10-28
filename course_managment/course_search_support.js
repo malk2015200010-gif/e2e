@@ -19,9 +19,10 @@
  * cards happen to render on page 1.
  */
 
+import { getAppBase } from '../../support/navigation.js'
 import { HTTP_AUTH } from '../../support/users'
 
-export const BASE = 'https://dev.mentoraeg.com'
+export const BASE = () => getAppBase()
 export const AUTH = HTTP_AUTH
 
 export const SEARCH_INPUT = 'input[name="q"]'
@@ -44,7 +45,7 @@ export const searchCoursesApi = (q, page) =>
   cy
     .request({
       method: 'GET',
-      url: `${BASE}/courses`,
+      url: `${BASE()}/courses`,
       auth: AUTH,
       qs: page ? { q, page } : { q },
       failOnStatusCode: false,
@@ -60,7 +61,7 @@ export const searchCoursesApi = (q, page) =>
 
 /** Real UI flow — type into the header search box and submit the form (full GET reload with ?q=). */
 export const searchCoursesUi = (term) => {
-  cy.visit(`${BASE}/courses`, { auth: AUTH, failOnStatusCode: false })
+  cy.visit(`${BASE()}/courses`, { auth: AUTH, failOnStatusCode: false })
   cy.get(SEARCH_INPUT, { timeout: 15000 }).filter(':visible').first().clear().type(term)
   cy.get(SEARCH_SUBMIT_BTN).filter(':visible').first().click({ force: true })
 }

@@ -12,7 +12,7 @@
  */
 
 import { visitWithAuth, loginViaApi } from '../../support/navigation'
-import { ADMIN } from '../../support/users'
+import { ADMIN, HTTP_AUTH } from '../../support/users'
 
 const NAVBAR_BELL =
   'header i.la-bell, .navbar i.la-bell, .topbar i.la-bell, .main-header i.la-bell, nav i.la-bell'
@@ -27,7 +27,12 @@ const SELECTORS = {
   notificationsPage: '[data-cy="admin-notifications-page"]',
   feed: '[data-cy="admin-notification-feed"]',
   needsAttention: '[data-cy="admin-dashboard-needs-attention"]',
+  /** Parent sidebar group that nests Payments / Instalments / Withdraws / Refunds */
+  financeMenu:
+    'a[data-admin-menu-group="payments,refund_requests,instalments,withdraws"], a[data-admin-menu-group*="payments"]',
   instalmentsMenu: 'a[data-admin-menu-item="instalments"]',
+  paymentsMenu: 'a[data-admin-menu-item="payments"]',
+  withdrawsMenu: 'a[data-admin-menu-item="withdraws"], a[data-admin-menu-item="withdrawals"]',
 }
 
 const navQueueBadge = (queueKey) => `[data-cy="nav-queue-badge-${queueKey}"]`
@@ -100,12 +105,25 @@ function registerNotificationIntercepts(summaryBody = defaultSummary, feedBody =
 
 /**
  * After redirect (e.g. dev.mentoraeg.com → localhost), align Cypress baseUrl with the real app origin.
+ * Skip about:blank — its origin serializes as the string "null" and would break later cy.visit calls.
  */
 function syncBaseUrlToApp() {
   cy.url().then((url) => {
+    if (!/^https?:\/\//i.test(url)) {
+      cy.log(`skip baseUrl sync — not on http(s) page yet: ${url}`)
+      return
+    }
+
     const origin = new URL(url).origin
+    if (!/^https?:\/\//i.test(origin)) {
+      cy.log(`skip baseUrl sync — invalid origin: ${origin}`)
+      return
+    }
+
     const configured = Cypress.config('baseUrl')
-    const configuredOrigin = configured ? new URL(configured).origin : null
+    const configuredOrigin = configured && /^https?:\/\//i.test(configured)
+      ? new URL(configured).origin
+      : null
 
     if (configuredOrigin && configuredOrigin !== origin) {
       Cypress.config('baseUrl', origin)
@@ -116,11 +134,11 @@ function syncBaseUrlToApp() {
 
 function loginAdmin() {
   loginViaApi(ADMIN)
-  syncBaseUrlToApp()
+  // Do not sync here: loginViaApi uses cy.request only; the browser may still be about:blank.
 }
 
 function goToAdminHome() {
-  cy.visit('https://dev.mentoraeg.com/admin', {
+  cy.visit('/admin', {
     auth: HTTP_AUTH,
     failOnStatusCode: false,
     timeout: 60000,
@@ -144,10 +162,25 @@ function getNavbarBell() {
 }
 
 function openNotificationBell() {
-  getNavbarBell().should('be.visible').then(($bell) => {
-    const $toggle = $bell.closest('a, button, .dropdown-toggle, .nav-link, .nav-item')
+  getNavbarBell().should('exist').then(($bell) => {
+    const $toggle = $bell.closest(
+      'a, button, .dropdown-toggle, .nav-link, .nav-item, [data-bs-toggle="dropdown"], [data-toggle="dropdown"]',
+    )
     const $target = $toggle.length ? $toggle.first() : $bell
-    cy.wrap($target).click({ force: true })
+    cy.wrap($target)
+      .scrollIntoView()
+      .click({ force: true })
+    // Bootstrap sometimes needs a second interaction in headless CI.
+    cy.wait(300)
+    cy.get('body').then(($body) => {
+      const open =
+        $body.find(
+          '.admin-topbar__dropdown-panel:visible, .dropdown-menu.show:visible, .dropdown-menu:visible, [data-cy="admin-notification-dropdown"]:visible, .admin-notification-dropdown:visible',
+        ).length > 0
+      if (!open) {
+        cy.wrap($target).click({ force: true })
+      }
+    })
   })
 }
 
@@ -158,13 +191,41 @@ function getUnreadBadge() {
 /** Bootstrap-style panel next to navbar bell (no API required). */
 function getBellDropdown() {
   return cy.get(
-    '.admin-topbar__dropdown-panel:visible, .dropdown-menu:visible, [data-cy="admin-notification-dropdown"]:visible, .admin-notification-dropdown:visible',
-    { timeout: 10000 }
+    [
+      '.admin-topbar__dropdown-panel:visible',
+      '.dropdown-menu.show:visible',
+      '.dropdown-menu:visible',
+      '[data-cy="admin-notification-dropdown"]:visible',
+      '.admin-notification-dropdown:visible',
+      '.notifications-dropdown:visible',
+      '.notification-dropdown:visible',
+      '[class*="notification"][class*="dropdown"]:visible',
+      '.admin-topbar .dropdown-menu:visible',
+    ].join(', '),
+    { timeout: 15000 },
   ).first()
 }
 
 function assertBellDropdownOpen() {
-  getBellDropdown().should('be.visible')
+  cy.get('body').then(($body) => {
+    const $open = $body.find(
+      '.admin-topbar__dropdown-panel:visible, .dropdown-menu.show:visible, .dropdown-menu:visible, [data-cy="admin-notification-dropdown"]:visible, .admin-notification-dropdown:visible, .notifications-dropdown:visible',
+    )
+    if ($open.length) {
+      cy.wrap($open.first()).should('be.visible')
+      return
+    }
+    // Soft: bell may open a non-dropdown panel (drawer / offcanvas) on some builds.
+    const $alt = $body.find(
+      '.offcanvas.show, .modal.show, [role="dialog"]:visible, .admin-topbar__notifications:visible',
+    )
+    if ($alt.length) {
+      cy.log('Notification UI opened as drawer/modal instead of dropdown — OK')
+      cy.wrap($alt.first()).should('be.visible')
+      return
+    }
+    getBellDropdown().should('be.visible')
+  })
 }
 
 /** After opening bell, run fn only if feed API was actually requested. */
@@ -194,19 +255,93 @@ function afterBellIfSummaryApi(fn) {
   })
 }
 
+/**
+ * Admin sidebar only — never bare `a` (phpdebugbar / topbar queue links pollute matches).
+ */
+const SIDEBAR_ROOT =
+  '.page-sidebar, .dashboard-menu, aside.page-sidebar, .sidebar, #sidebar, .admin-sidebar, .left-side, ul.page-sidebar-menu'
+
+function isIgnoredNavLink(el) {
+  if (!el || !el.closest) return true
+  if (el.classList?.contains('phpdebugbar-tab')) return true
+  if (el.closest('.phpdebugbar, #phpdebugbar')) return true
+  if (el.closest('.admin-notification-dropdown, .admin-topbar__dropdown-panel')) return true
+  return false
+}
+
+/**
+ * Prefer visible sidebar links. Avoids hidden topbar queue links and phpdebugbar tabs.
+ * Only matches :visible anchors (won't grab Payments inside display:none submenu).
+ */
+function visibleNavLink(label, timeout = 15000) {
+  return cy
+    .get(`${SIDEBAR_ROOT} a, a[data-admin-menu-item], a[data-admin-menu-group]`, { timeout })
+    .filter(':visible')
+    .filter((_, el) => !isIgnoredNavLink(el))
+    .filter((_, el) => {
+      const text = (el.textContent || '').replace(/\d+/g, '').replace(/\s+/g, ' ').trim()
+      return text === label || text.includes(label)
+    })
+    .first()
+}
+
+function financeMenuLink() {
+  return cy.get(SELECTORS.financeMenu, { timeout: 15000 }).filter(':visible').first()
+}
+
+/**
+ * Finance opens when its <a> gets class "opened" and
+ * sibling/child ul.nav.nav-second-level becomes display:block.
+ */
+function expandFinanceMenu() {
+  financeMenuLink().should('be.visible').then(($link) => {
+    if ($link.hasClass('opened')) {
+      cy.log('Finance already has class opened')
+      return
+    }
+    // Click the Finance anchor itself (this is what toggles class="opened")
+    cy.wrap($link).click({ force: true })
+  })
+
+  financeMenuLink().should('have.class', 'opened')
+
+  financeMenuLink().parent().within(() => {
+    cy.get('ul.nav.nav-second-level', { timeout: 15000 })
+      .should('exist')
+      .and(($ul) => {
+        expect(Cypress.$($ul).css('display'), 'Finance second-level menu display').to.not.eq('none')
+      })
+      .and('be.visible')
+  })
+
+  cy.contains('ul.nav.nav-second-level a:visible', 'Payments', { timeout: 15000 }).should('be.visible')
+}
+
+function financeChildLink(label, menuItem) {
+  expandFinanceMenu()
+  if (menuItem) {
+    return cy
+      .get(`a[data-admin-menu-item="${menuItem}"]`, { timeout: 15000 })
+      .filter(':visible')
+      .first()
+  }
+  return cy.contains('ul.nav.nav-second-level a:visible', label, { timeout: 15000 })
+}
+
 describe('Admin unified notifications (Phase 1)', () => {
   describe('Smoke — no notification API required', () => {
     it('admin logs in and reaches admin home', () => {
       loginAdmin()
       goToAdminHome()
-      cy.contains('a', 'Admin Home').should('be.visible')
+      visibleNavLink('Admin Home').should('be.visible')
     })
 
     it('admin sidebar includes existing queue links (pre–Phase 1)', () => {
       loginAdmin()
       goToAdminHome()
-      cy.contains('Courses').should('be.visible')
-      cy.contains('Course Updates').should('be.visible')
+      visibleNavLink('Courses').should('be.visible')
+      visibleNavLink('Course Updates').should('be.visible')
+      financeMenuLink().should('be.visible').and('contain.text', 'Finance')
     })
 
     it('navbar shows notification bell icon', () => {
@@ -335,22 +470,50 @@ describe('Admin unified notifications (Phase 1)', () => {
       goToAdminHome()
     })
 
-    it('dashboard shows main admin work queue links in sidebar', () => {
-      cy.contains('a', 'Courses', { timeout: 15000 }).should('be.visible')
-      cy.contains('a', 'Course Updates').should('be.visible')
-      cy.contains('Payments').should('be.visible')
+    it('dashboard shows Finance group and main course links in sidebar', () => {
+      visibleNavLink('Courses').should('be.visible')
+      visibleNavLink('Course Updates').should('be.visible')
+      financeMenuLink().should('be.visible').and('contain.text', 'Finance')
     })
 
-    it('sidebar lists admin work queues that need attention', () => {
-      ;['Course Updates', 'Payments', 'Withdraws', 'Instalments', 'Instructor Verifications', 'WhatsApp'].forEach(
-        (label) => {
-          cy.get('a').filter(':visible').contains(label, { timeout: 15000 }).should('be.visible')
+    it('Finance submenu lists payment-related work queues', () => {
+      expandFinanceMenu()
+      ;[
+        ['Payments', 'payments'],
+        ['Refund Requests', 'refund_requests'],
+        ['Instalments', 'instalments'],
+        ['Withdraws', 'withdraws'],
+      ].forEach(([label, menuItem]) => {
+        cy.get('body').then(($body) => {
+          const $byAttr = $body.find(`a[data-admin-menu-item="${menuItem}"]`).filter(':visible')
+          if ($byAttr.length) {
+            cy.wrap($byAttr.first()).should('be.visible')
+            return
+          }
+          cy.contains('ul.nav.nav-second-level a:visible', label, { timeout: 15000 }).should('be.visible')
+        })
+      })
+    })
+
+    it('sidebar lists non-finance work queues that need attention', () => {
+      ;['Course Updates', 'Instructor Verifications', 'WhatsApp'].forEach((label) => {
+        visibleNavLink(label).should('be.visible')
+      })
+    })
+
+    it('sidebar shows Finance parent badge when present', () => {
+      financeMenuLink().should('be.visible').then(($link) => {
+        const $badge = $link.find('.badge')
+        if ($badge.length === 0) {
+          cy.log('No Finance badge present yet')
+          return
         }
-      )
+        cy.wrap($badge.first()).invoke('text').should('match', /\d+/)
+      })
     })
 
-    it('sidebar shows instalments badge when present', () => {
-      cy.get(SELECTORS.instalmentsMenu, { timeout: 15000 }).should('be.visible').then(($link) => {
+    it('sidebar shows instalments badge under Finance when present', () => {
+      financeChildLink('Instalments', 'instalments').should('be.visible').then(($link) => {
         const $badge = $link.find('.badge')
         if ($badge.length === 0) {
           cy.log('No Instalments badge present yet')
@@ -362,7 +525,7 @@ describe('Admin unified notifications (Phase 1)', () => {
 
     it('sidebar shows numeric badges on Course Updates or WhatsApp when present', () => {
       ;['Course Updates', 'WhatsApp'].forEach((label) => {
-        cy.get('a').filter(':visible').contains(label, { timeout: 15000 }).then(($link) => {
+        visibleNavLink(label).then(($link) => {
           const $badge = $link.closest('li').find('.badge')
           if ($badge.length === 0) {
             cy.log(`No .badge next to "${label}" yet`)

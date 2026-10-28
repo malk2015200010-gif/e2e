@@ -5,7 +5,7 @@
  *        /admin/verifications; only then can instructor publish courses.
  *
  * E2E flow (testIsolation: false):
- *   MEN-231-01  Register new instructor (no email verification)
+ *   MEN-231-01  Register new instructor (complete email verify on dig)
  *   MEN-231-02  Instructor lands on Settings → Verification upload page
  *   MEN-231-03  Valid ID card image submitted → pending review
  *   MEN-231-04  Uploaded ID shows pending — waiting for admin approval
@@ -55,7 +55,7 @@ let courseId = null
 
 describe('MEN-231 — ID upload → Admin approve → Publish allowed', { testIsolation: false }, () => {
 
-  it('MEN-231-01 | [Positive] Register new instructor (no email verification)', () => {
+  it('MEN-231-01 | [Positive] Register new instructor and reach dashboard', () => {
     registerFreshInstructorReady('main').then((user) => {
       freshInstructor = user
     })
@@ -136,7 +136,7 @@ describe('MEN-231 — Validation & access control', () => {
     )
     cy.get('@isoInstructor').then((user) => openIdentityVerificationPage(user))
     clickUploadDocumentBtn()
-    getIdDocumentInput().selectFile(ID_INVALID, { force: true })
+    getIdDocumentInput().selectFile(ID_INVALID(), { force: true })
     clickUploadDocumentBtn()
     cy.get('body', { timeout: 15000 }).invoke('text').should('match',
       /invalid|not allowed|image|pdf|jpg|png|jpeg|file type|غير صالح|نوع الملف/i)
@@ -148,7 +148,7 @@ describe('MEN-231 — Validation & access control', () => {
 
     cy.request({
       method: 'GET',
-      url: `${BASE}${IDENTITY_ROUTE}`,
+      url: `${BASE()}${IDENTITY_ROUTE}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,
@@ -166,7 +166,7 @@ describe('MEN-231 — Validation & access control', () => {
 
     cy.request({
       method: 'GET',
-      url: `${BASE}${IDENTITY_ROUTE}`,
+      url: `${BASE()}${IDENTITY_ROUTE}`,
       auth: AUTH,
       failOnStatusCode: false,
       followRedirect: true,

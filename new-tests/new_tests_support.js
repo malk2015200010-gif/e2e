@@ -2,80 +2,55 @@ import './soft_mode.js'
 
 /**
  * Helpers for e2e/new-tests — aligned with live dev.mentoraeg.com behavior.
+ * Cart add / empty-cart detection is shared with payment/xpay_support.js.
  */
 
-import { loginViaApi } from '../../support/navigation.js'
+import { loginAndVisit } from '../../support/navigation.js'
 import { HTTP_AUTH, STUDENT, STUDENTS } from '../../support/users.js'
+import {
+  BASE,
+  addPaidCourseToCart,
+  cartHasItems,
+  go,
+} from '../payment/xpay_support.js'
 
-export const BASE = 'https://dev.mentoraeg.com'
+export { BASE, addPaidCourseToCart, cartHasItems, go }
 export const AUTH = HTTP_AUTH
 
 /** Student known to have (or easily create) pending offline payments */
 export const PENDING_STUDENT =
   STUDENTS.find((s) => s.email === 'studentbuysession@demo.com') || STUDENT
 
-/** Cleaner student for cart / voucher / price tests */
+/**
+ * Cart / voucher / price student.
+ * malk2015200010d is soft-deleted and /checkout bounces to /login.
+ * student5 can open checkout; keep the XPay card student (…j) out of these specs.
+ */
 export const CHECKOUT_STUDENT =
-  STUDENTS.find((s) => s.email === 'malk2015200010q@gmail.com') || STUDENT
+  STUDENTS.find((s) => s.email === 'student5@demo.com') ||
+  STUDENTS.find((s) => s.email === 'malk2015200010j@gmail.com') ||
+  STUDENT
+
+/** Second checkout account so a spec can submit offline twice without the first pending payment blocking the next. */
+export const CHECKOUT_STUDENT_ALT =
+  STUDENTS.find((s) => s.email === 'studentbuysession@demo.com') || CHECKOUT_STUDENT
+
+/**
+ * Voucher specs only stub validate-voucher — they must not share an account that
+ * TC-NEW-002 leaves with a pending offline payment. This account is not used to pay.
+ */
+export const VOUCHER_STUDENT =
+  STUDENTS.find((s) => s.email === 'malk2015200010j@gmail.com') || CHECKOUT_STUDENT
 
 export const PENDING_MSG_RE =
   /already have a pending payment|pending payment|please wait/i
 
-export const go = (path, opts = {}) =>
-  cy.visit(`${BASE}${path.startsWith('/') ? path : `/${path}`}`, {
-    auth: AUTH,
-    failOnStatusCode: false,
-    timeout: 60000,
-    ...opts,
-  })
+export const loginAs = (user) => loginAndVisit(user, '/dashboard')
 
-export const loginAs = (user) =>
-  loginViaApi(user).then(() => {
-    go('/dashboard')
-    return cy.url({ timeout: 20000 }).should((url) => {
-      expect(url).to.satisfy((u) => !u.includes('/login'), `logged in as ${user.email}`)
-    })
-  })
-
-export const cartHasItems = ($body) => {
-  if (/your cart is empty|cart is empty|سلة/i.test($body.text())) return false
-  const badge = $body.find('.badge.badge-pill').first()
-  return badge.length > 0 && badge.text().trim() !== '0'
-}
-
-export const addFirstCourseToCart = () => {
-  go('/courses')
-  cy.get('body', { timeout: 15000 }).should('exist')
-  cy.get('body').then(($body) => {
-    if (cartHasItems($body)) {
-      cy.log('Cart already has items')
-      return
-    }
-
-    const courseId =
-      $body.find('.add-to-cart-btn[data-course-id]').first().attr('data-course-id') || '423'
-    const token =
-      ($body.find('input[name="_token"]').val() ||
-        $body.find('meta[name="csrf-token"]').attr('content') ||
-        '') + ''
-
-    // Prefer the real API — UI add-to-cart clicks are flaky (re-render / overlays).
-    cy.request({
-      method: 'POST',
-      url: `${BASE}/add-to-cart`,
-      auth: AUTH,
-      form: true,
-      failOnStatusCode: false,
-      headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-      body: { _token: token, course_id: courseId },
-    }).then((res) => {
-      expect(res.status, 'add-to-cart status').to.be.oneOf([200, 302])
-    })
-  })
-}
+export const addFirstCourseToCart = (courseId) => addPaidCourseToCart(courseId)
 
 export const openCheckoutWithCart = () => {
-  addFirstCourseToCart()
+  addPaidCourseToCart()
   go('/checkout')
   cy.url({ timeout: 20000 }).should('include', '/checkout')
   cy.get('body', { timeout: 15000 }).should(($body) => {

@@ -3,7 +3,10 @@
  *
  * Story: Show a fixed WhatsApp button on all public pages. Clicking it opens
  * a chat with Mentora via the existing wa.me URL. Users can dismiss it with
- * a close button; dismissal persists across visits.
+ * a close button.
+ *
+ * Business update: the icon must be visible again on reload (dismissal is
+ * page-instance only — it does NOT persist across reloads or new visits).
  *
  * Covers MEN-2396 … MEN-2410 (see whatsapp_float_test_cases.csv).
  */
@@ -19,7 +22,6 @@ import {
   assertWaMeLink,
   assertWaMeGreetingText,
   getDismissedFlag,
-  clearDismissedFlag,
   loginStudent,
   loginAdmin,
   assertOnAdminPanel,
@@ -92,30 +94,31 @@ describe('WhatsApp Floating Button', () => {
     assertWidgetNotVisible()
   })
 
-  it('MEN-2405 | [Positive] Dismissal persists across a reload of the same page', () => {
+  it('MEN-2405 | [Positive] Icon is visible again after reload (dismissal does not persist)', () => {
+    // Business request: icon must be visible again on reload.
     goFresh('')
     dismissWidget()
-    getDismissedFlag().should('eq', '1')
-    cy.reload()
     assertWidgetNotVisible()
+    cy.reload()
+    assertWidgetVisible()
   })
 
-  it('MEN-2406 | [Positive] Dismissal persists across visits to different public pages', () => {
+  it('MEN-2406 | [Positive] Icon shows again when visiting another public page after dismiss', () => {
     goFresh('')
     dismissWidget()
+    assertWidgetNotVisible()
     go('courses')
-    assertWidgetNotVisible()
+    assertWidgetVisible()
     go('about-us')
-    assertWidgetNotVisible()
+    assertWidgetVisible()
   })
 
-  it('MEN-2410 | [Positive] Dismissal can be reset — clearing local storage restores the button', () => {
+  it('MEN-2410 | [Positive] Dismiss does not persist a localStorage flag across reloads', () => {
     goFresh('')
     dismissWidget()
-    cy.reload()
     assertWidgetNotVisible()
-
-    clearDismissedFlag()
+    // Legacy key must not keep the widget hidden after reload.
+    getDismissedFlag().should('not.eq', '1')
     cy.reload()
     assertWidgetVisible()
   })
@@ -130,16 +133,11 @@ describe('WhatsApp Floating Button', () => {
   it('MEN-2408 | [Positive] Button and its labels are localized in Arabic', () => {
     cy.clearCookies()
     go('locale/ar') // redirects to the homepage rendered in Arabic
-    // Assert on the very page this navigation lands on — the widget's
-    // inline script already runs on every fresh page load (this is a brand
-    // new guest session per Cypress's test isolation), so no extra
-    // dismiss-flag reset / reload is needed here.
     cy.get('html', { timeout: 15000 }).should('have.attr', 'lang', 'ar')
     widget()
       .should('be.visible')
       .and('have.attr', 'aria-label')
       .should('match', /[\u0600-\u06FF]/)
-    // URLSearchParams already URI-decodes the value.
     assertWaMeGreetingText().should((text) => {
       expect(text).to.match(/[\u0600-\u06FF]/)
     })
@@ -147,10 +145,6 @@ describe('WhatsApp Floating Button', () => {
 
   it('MEN-2409 | [Negative] Floating button is not shown inside the admin panel layout', () => {
     loginAdmin()
-    // Confirm we're actually on the real admin layout (not silently
-    // redirected elsewhere, e.g. back to the public homepage — which would
-    // make the widget-absence assertion below pass/fail for the wrong
-    // reason) before asserting the widget is absent.
     assertOnAdminPanel()
     cy.get(WIDGET_SEL).should('not.exist')
   })

@@ -1,97 +1,56 @@
-import { visitWithAuth } from '../../support/navigation';
+import { visitWithAuth } from '../../support/navigation'
+import {
+  fillRegisterForm,
+  typeConfirmPassword,
+  submitRegister,
+  assertRegistrationSucceeded,
+  REGISTER_SUBMIT,
+} from './password_policy_support.js'
 
-it('Valid Registration', () => {
+const assertStillOnRegister = () => {
+  cy.url({ timeout: 15000 }).should('include', '/register')
+}
 
-   visitWithAuth('register')    
-
-    const inputs = cy.get('input:visible')
-
-    // Name
-    cy.get('input[id="name"]').eq(0).type('Test User')   
-
-    // Email
-    cy.get('input[id="email"]').eq(0).type(`test${Date.now()}@mail.com`)
-    // Phone
-    cy.get('input[id="phone_number"]').type('1012345678')
-
-    // Password
-    cy.get('input[id="password"]').eq(0).type('Test@1234')
-
-    // Confirm Password
-    cy.get('input[id="password-confirm"]').eq(0).type('Test@1234')
-
-    // Student
-    //cy.contains('Student').click()
-
-    // Submit
-    cy.get('button[class="btn btn-primary w-100 mb-3"]').click()
-  });
+describe('Student registration validation', () => {
+  it('Valid Registration', () => {
+    fillRegisterForm({ role: 'student' })
+    submitRegister()
+    assertRegistrationSucceeded()
+  })
 
   it('Negative - invalid phone format', () => {
-    visitWithAuth('register') 
+    visitWithAuth('register')
 
     cy.get('input[id="name"]').type('Test User')
-
-    cy.get('input[type="email"]:visible')
-      .type(`test${Date.now()}@mail.com`)
-
-    cy.get('input[placeholder="123456789"]')
-      .type('ABC123')   // ❌ invalid phone
-
-     cy.get('input[id="password"]').eq(0).type('Test@1234')
-     cy.get('input[id="password-confirm"]').eq(0).type('Test@1234')
-
-    //cy.contains('Student').click()
-
-    cy.get('button[class="btn btn-primary w-100 mb-3"]').click()
-
-   
+    cy.get('input[type="email"]:visible').type(`test${Date.now()}@mail.com`)
+    cy.get('input[placeholder="123456789"]').first().type('ABC123')
+    cy.get('input[id="password"]').filter(':visible').first().clear({ force: true }).type('Test@1234', { force: true, delay: 15 })
+    typeConfirmPassword('Test@1234')
+    cy.get(REGISTER_SUBMIT).first().click({ force: true })
+    assertStillOnRegister()
   })
 
- it('Negative - invalid email format', () => {
-    
-  
-  visitWithAuth('register')    
-
-
-    
+  it('Negative - invalid email format', () => {
+    visitWithAuth('register')
     cy.get('input[id="name"]').type('Test User')
-
-    cy.get('input[id="email"]:visible').eq(0).type('test@')   // ❌ invalid email
-
-    cy.get('button[class="btn btn-primary w-100 mb-3"]').click()
-
-    })
-
-  
+    cy.get('input[id="email"]:visible').eq(0).type('test@')
+    cy.get(REGISTER_SUBMIT).first().click({ force: true })
+    assertStillOnRegister()
+  })
 
   it('Negative - empty required fields', () => {
-    visitWithAuth('register')    
-
-
-    cy.get('button[class="btn btn-primary w-100 mb-3"]').click()
-
-    
+    visitWithAuth('register')
+    cy.get(REGISTER_SUBMIT).first().click({ force: true })
+    assertStillOnRegister()
   })
-
 
   it('Negative - password mismatch', () => {
-    visitWithAuth('register')    
-
-
+    visitWithAuth('register')
     cy.get('input[id="name"]').type('Test User')
-
-    cy.get('input[type="email"]:visible')
-      .type(`test${Date.now()}@mail.com`)
-
-    cy.get('input[id="password"]').eq(0).type('Test@1234')
-    cy.get('input[id="password-confirm"]').eq(0).type('Wrong@123')
-
-    cy.get('button[class="btn btn-primary w-100 mb-3"]').click()
-
-    cy.get('input[id="password"]').then(($input) => {
-    expect($input[0].validationMessage).to.not.equal('input[id="password-confirm"]')
-    })
+    cy.get('input[type="email"]:visible').type(`test${Date.now()}@mail.com`)
+    cy.get('input[id="password"]').filter(':visible').first().clear({ force: true }).type('Test@1234', { force: true, delay: 15 })
+    typeConfirmPassword('Wrong@123')
+    cy.get(REGISTER_SUBMIT).first().click({ force: true })
+    assertStillOnRegister()
   })
-
-  
+})

@@ -1,9 +1,16 @@
 Key,Type,Summary,Role,Expected
 CAR-001,Positive,Instructor can open all management tabs of own course,Instructor,Information / curriculum / enrollments accessible
-CAR-002,Positive,Admin can open any course on the platform,Admin,/admin/courses and course detail accessible
-CAR-003,Positive,Enrolled student can open enrolled course content,Student,Course + lecture accessible while enrollment active
-CAR-004,Positive,Enrolled student sees course in enrolled-courses list,Student,Course listed under /dashboard/enrolled-courses
-CAR-005,Negative,Student cannot open instructor dashboard course management,Student,Redirected away from /dashboard/courses/{id}/curriculum
-CAR-006,Negative,Student cannot learn a course they are not enrolled in,Student,Enroll/buy CTA or learning blocked
-CAR-007,Negative,Student with pending payment cannot get active course access,Student,Pending state / enroll CTA / blocked learning
-CAR-008,Negative,Guest cannot use instructor/admin course management,Guest,Redirected to login or denied
+CAR-002,Positive,Instructor can access multiple owned courses,Instructor,At least one/two own course information pages open without denial
+CAR-003,Positive,Instructor can open the public landing page of own course,Instructor,/courses/{slug} loads without 404/denial
+CAR-004,Positive,Admin can open any course on the platform,Admin,/admin/courses and course enrollments accessible
+CAR-005,Positive,Admin can open a public course page on the platform,Admin,/courses/{slug} loads for admin
+CAR-006,Positive,Enrolled student can open enrolled course content while access is active,Student,Course (+ lecture if present) accessible
+CAR-007,Positive,Enrolled student sees course in enrolled-courses list,Student,Course listed under /dashboard/enrolled-courses
+CAR-008,Negative,Student cannot open instructor dashboard course management,Student,Redirected away from /dashboard/courses/{id}/curriculum
+CAR-009,Negative,Student cannot open admin course management,Student,Redirected away from /admin/courses
+CAR-010,Negative,Student cannot learn a course they are not enrolled in,Student,Enroll/buy CTA or learning blocked
+CAR-011,Negative,Alternate student without enrollment blocked from learning,Student (alt),Enroll/buy CTA or learning blocked
+CAR-012,Negative,Student with pending payment cannot get active course access,Student,Pending state / enroll CTA / blocked learning
+CAR-013,Mixed,Enrolled page shows access/payment restriction signals when present,Student,Page loads; optional suspended/expired/pending/refund CTAs
+CAR-014,Negative,Guest cannot open instructor course management,Guest,Redirected to /login from /dashboard/my-courses
+CAR-015,Negative,Guest cannot open admin course management,Guest,Redirected to login or denied on /admin/courses

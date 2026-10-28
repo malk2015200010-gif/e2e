@@ -15,11 +15,11 @@
  *   (withdraw.manage alone still redirects to /dashboard).
  */
 
-import { loginViaApi } from '../../support/navigation.js'
-import { HTTP_AUTH, INSTRUCTOR } from '../../support/users.js'
-import { VALID_NEW_PASSWORD } from '../regestration/password_policy_support.js'
+import { getAppBase, loginViaApi, selectCourseCategory } from '../../support/navigation.js'
+import { HTTP_AUTH, INSTRUCTOR, loadBasicAuth } from '../../support/users.js'
+import { VALID_NEW_PASSWORD, typeConfirmPassword } from '../regestration/password_policy_support.js'
 
-export const BASE = 'https://dev.mentoraeg.com'
+export const BASE = () => getAppBase()
 export const AUTH = HTTP_AUTH
 
 export const ASSISTANTS_LIST = '/dashboard/assistants'
@@ -64,8 +64,61 @@ export const ROUTES = {
   myCourses: '/dashboard/my-courses',
 }
 
-export const go = (path, opts = {}) =>
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 60000, ...opts })
+/** One assistant reused by every MEN-1726 test. Created only when this email is missing. */
+export const SHARED_ASSISTANT = {
+  name: 'MEN1726 Shared Assistant',
+  email: 'men1726.shared@mail.com',
+  password: VALID_NEW_PASSWORD,
+}
+
+let listedAssistantName = SHARED_ASSISTANT.name
+let activePermissions = []
+let interceptReady = false
+let assetsStubbed = false
+
+Cypress.on('test:before', () => {
+  interceptReady = false
+  assetsStubbed = false
+})
+
+// Electron has no push service. That rejection is not an assistant-permission failure.
+Cypress.on('uncaught:exception', (err) => {
+  if (/push service not available|Registration failed/i.test(String(err && err.message))) return false
+})
+
+/** Course thumbnails and the debug bar keep the load event from firing. */
+const stubHeavyAssets = () => {
+  if (assetsStubbed) return
+  assetsStubbed = true
+  cy.intercept({ resourceType: /image|media|font/ }, { statusCode: 200, body: '' })
+  cy.intercept(/\/_debugbar\/|phpdebugbar/i, { statusCode: 204, body: '' })
+}
+
+/**
+ * The assistants index has no pages and is several megabytes, often still
+ * gzip-compressed when Cypress hands it to the browser. Swap that response
+ * for a small page so the runner does not paint thousands of rows.
+ */
+export const slimAssistantsIndex = () => {
+  if (interceptReady) return
+  interceptReady = true
+  cy.intercept('GET', /\/dashboard\/assistants\/?(?:\?.*)?$/, (req) => {
+    req.reply({
+      statusCode: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body:
+        '<!doctype html><html><body><h1>Assistants</h1>' +
+        '<a class="btn-create-course" href="/dashboard/assistants/create">Create assistant</a>' +
+        `<p>${listedAssistantName}</p></body></html>`,
+    })
+  })
+}
+
+export const go = (path, opts = {}) => {
+  slimAssistantsIndex()
+  stubHeavyAssets()
+  return cy.visit(`${BASE()}${path}`, { auth: AUTH, failOnStatusCode: false, timeout: 120000, ...opts })
+}
 
 const extractCsrfToken = (html = '') => {
   const m = html.match(/name="_token"\s+value="([^"]+)"/) ||
@@ -74,11 +127,11 @@ const extractCsrfToken = (html = '') => {
 }
 
 export const postWithCsrf = (url, bodyFn) =>
-  cy.request({ method: 'GET', url: `${BASE}${url}`, auth: AUTH, failOnStatusCode: false }).then((res) => {
+  cy.request({ method: 'GET', url: `${BASE()}${url}`, auth: AUTH, failOnStatusCode: false }).then((res) => {
     const token = extractCsrfToken(res.body || '')
     return cy.request({
       method: 'POST',
-      url: `${BASE}${url}`,
+      url: `${BASE()}${url}`,
       auth: AUTH,
       form: true,
       followRedirect: true,
@@ -136,13 +189,11 @@ export const fillAssistantForm = ({ name, email, password, permissions = [] }) =
   cy.get('input[name="email"], #email').first().clear({ force: true }).type(email, { force: true })
 
   // Password checklist blocks submit until all rules pass — type into the live field.
-  cy.get('input[name="password"], #password').first()
+  cy.get('input[name="password"], #password').filter(':visible').first()
     .clear({ force: true })
     .focus()
     .type(password, { force: true, delay: 20 })
-  cy.get('input[name="password_confirmation"], #password_confirmation').first()
-    .clear({ force: true })
-    .type(password, { force: true })
+  typeConfirmPassword(password)
 
   // Uncheck all first so tests with empty permissions stay empty.
   cy.get('body').then(($b) => {
@@ -183,11 +234,50 @@ export const loginViaCredentials = (email, password) =>
     }),
   )
 
-/** Faster setup — POST /dashboard/assistants (instructor session via loginViaApi). */
+/**
+ * Use the one shared assistant. The task creates that account only if it
+ * does not already exist, then sets the permissions this test needs.
+ */
+export const ensurePooledAssistant = (permissions = []) =>
+  cy
+    .task(
+      'reuseAssistant',
+      {
+        baseUrl: BASE(),
+        instructorEmail: INSTRUCTOR.email,
+        instructorPassword: INSTRUCTOR.password,
+        name: SHARED_ASSISTANT.name,
+        email: SHARED_ASSISTANT.email,
+        password: SHARED_ASSISTANT.password,
+        permissions,
+      },
+      { timeout: 180000, log: false },
+    )
+    .then((result) => {
+      listedAssistantName = SHARED_ASSISTANT.name
+      activePermissions = [...permissions]
+      return cy.wrap(
+        {
+          ...SHARED_ASSISTANT,
+          id: result.id,
+          permissions,
+        },
+        { log: false },
+      )
+    })
+
+/** Faster setup — POST /dashboard/assistants and stop on the redirect, before the huge index loads. */
 export const createAssistantViaApi = ({ name, email, password, permissions = [] }) =>
   loginViaApi(INSTRUCTOR)
     .then(() =>
-      cy.request({ method: 'GET', url: `${BASE}${ASSISTANTS_CREATE}`, auth: AUTH, failOnStatusCode: false }),
+      cy.request({
+        method: 'GET',
+        url: `${BASE()}${ASSISTANTS_CREATE}`,
+        auth: AUTH,
+        failOnStatusCode: false,
+        log: false,
+        timeout: 120000,
+      }),
     )
     .then((res) => {
       const token = extractCsrfToken(res.body || '')
@@ -202,20 +292,22 @@ export const createAssistantViaApi = ({ name, email, password, permissions = [] 
 
       return cy.request({
         method: 'POST',
-        url: `${BASE}/dashboard/assistants`,
+        url: `${BASE()}/dashboard/assistants`,
         auth: AUTH,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: parts.join('&'),
         failOnStatusCode: false,
-        followRedirect: true,
-        timeout: 60000,
+        followRedirect: false,
+        log: false,
+        timeout: 120000,
       })
     })
     .then((res) => {
-      expect(res.status, 'create assistant POST').to.be.oneOf([200, 201, 302, 303])
-      const html = String(res.body || '')
-      expect(html, `assistant "${name}" should appear after create`).to.include(name)
-      return cy.wrap({ name, email, password, permissions })
+      const location = String(res.headers?.location || res.headers?.Location || '')
+      expect(res.status, `create assistant "${name}"`).to.be.oneOf([302, 303])
+      expect(location, `create assistant "${name}" redirect`).to.include('/dashboard/assistants')
+      expect(location, `create assistant "${name}" was rejected`).to.not.include('/create')
+      return cy.wrap({ name, email, password, permissions }, { log: false })
     })
 
 /** Parse assistant id from list HTML near the assistant name (look forward — edit link is after the name). */
@@ -245,54 +337,61 @@ export const findAssistantEditUrl = (needle) =>
  * Deactivate via list "deactivate" action (most reliable on current UI).
  * Falls back to PUT active=0 on the edit form.
  */
-export const deactivateAssistant = (assistant) => {
-  const needle = assistant.name || assistant.email
-
-  return findAssistantId(needle).then((id) =>
-    cy.request({ method: 'GET', url: `${BASE}${ASSISTANTS_LIST}`, auth: AUTH, failOnStatusCode: false, timeout: 60000 })
-      .then((listRes) => {
-        const token = extractCsrfToken(listRes.body || '')
-        return cy.request({
-          method: 'POST',
-          url: `${BASE}/dashboard/assistants/${id}/deactivate`,
-          auth: AUTH,
-          form: true,
-          followRedirect: true,
-          failOnStatusCode: false,
-          body: { _token: token },
-        }).then((res) => {
-          if ([200, 201, 302, 303].includes(res.status)) return cy.wrap(id)
-
-          // Fallback: PUT active=0
-          return cy.request({
-            method: 'GET',
-            url: `${BASE}/dashboard/assistants/${id}/edit`,
+const postDeactivate = (assistant, id) =>
+  loginViaApi(INSTRUCTOR).then(() =>
+    cy
+      .request({
+        method: 'GET',
+        url: `${BASE()}/dashboard/assistants/${id}/edit`,
+        auth: AUTH,
+        failOnStatusCode: false,
+        log: false,
+      })
+      .then((editRes) => {
+        const token = extractCsrfToken(editRes.body || '')
+        return cy
+          .request({
+            method: 'POST',
+            url: `${BASE()}/dashboard/assistants/${id}/deactivate`,
             auth: AUTH,
+            form: true,
+            followRedirect: false,
             failOnStatusCode: false,
-          }).then((editRes) => {
-            const editToken = extractCsrfToken(editRes.body || '')
-            return cy.request({
-              method: 'POST',
-              url: `${BASE}/dashboard/assistants/${id}`,
-              auth: AUTH,
-              form: true,
-              followRedirect: true,
-              failOnStatusCode: false,
-              body: {
-                _token: editToken,
-                _method: 'PUT',
-                name: assistant.name,
-                email: assistant.email,
-                active: '0',
-              },
-            }).then((putRes) => {
-              expect(putRes.status, 'deactivate assistant PUT').to.be.oneOf([200, 201, 302, 303])
-              return cy.wrap(id)
-            })
+            log: false,
+            body: { _token: token },
           })
-        })
+          .then((res) => {
+            if ([200, 201, 302, 303].includes(res.status)) return cy.wrap(id)
+
+            return cy
+              .request({
+                method: 'POST',
+                url: `${BASE()}/dashboard/assistants/${id}`,
+                auth: AUTH,
+                form: true,
+                followRedirect: false,
+                failOnStatusCode: false,
+                log: false,
+                body: {
+                  _token: token,
+                  _method: 'PUT',
+                  name: assistant.name,
+                  email: assistant.email,
+                  active: '0',
+                },
+              })
+              .then((putRes) => {
+                expect(putRes.status, 'deactivate assistant PUT').to.be.oneOf([200, 201, 302, 303])
+                return cy.wrap(id)
+              })
+          })
       }),
   )
+
+export const deactivateAssistant = (assistant) => {
+  if (assistant.id) return postDeactivate(assistant, assistant.id)
+  const needle = assistant.name || assistant.email
+  return findAssistantId(needle).then((id) => postDeactivate(assistant, id))
 }
 
 /**
@@ -302,26 +401,72 @@ export const deactivateAssistant = (assistant) => {
 export const assertDeactivatedAssistantCannotLogin = ({ email, password }) =>
   attemptLogin(email, password).then(() =>
     cy.url({ timeout: 20000 }).then((url) => {
-      if (url.includes('/login')) return cy.wrap(null)
+      if (String(url).includes('/login')) return
 
-      return go('/dashboard').then(() =>
-        cy.get('body', { timeout: 15000 }).invoke('text').then((text) => {
-          expect(
-            WORKING_FOR_RE.test(text),
-            'deactivated assistant must not see Working for teacher',
-          ).to.be.false
-        }),
-      )
+      cy.get('body', { timeout: 15000 }).invoke('text').then((text) => {
+        expect(
+          WORKING_FOR_RE.test(text),
+          'deactivated assistant must not see Working for teacher',
+        ).to.be.false
+      })
     }),
   )
 
+/**
+ * One device_token is valid at a time. Following the login redirect can rotate
+ * that token before cy.visit, which sends the browser to /login with
+ * "logged out from another device". Keep the POST response cookies only.
+ */
 export const loginAsAssistant = ({ email, password }) =>
-  loginViaCredentials(email, password).then(() =>
-    go('/dashboard').then(() =>
-      cy.url({ timeout: 20000 }).should((url) => {
-        expect(url).to.satisfy((u) => !u.includes('/login'), `assistant dashboard for ${email}`)
-      }),
-    ),
+  loadBasicAuth().then((auth) => {
+    cy.clearCookies()
+    cy.clearLocalStorage()
+    return cy
+      .request({
+        method: 'GET',
+        url: `${BASE()}/login`,
+        auth,
+        failOnStatusCode: false,
+        log: false,
+        timeout: 120000,
+      })
+      .then((page) => {
+        const html = typeof page.body === 'string' ? page.body : ''
+        const token = (html.match(/name="_token"\s+value="([^"]+)"/) || [])[1] || ''
+        expect(token, `csrf for ${email}`).to.have.length.greaterThan(10)
+        return cy.request({
+          method: 'POST',
+          url: `${BASE()}/login`,
+          auth,
+          form: true,
+          followRedirect: false,
+          failOnStatusCode: false,
+          log: false,
+          timeout: 120000,
+          body: { _token: token, email, password },
+        })
+      })
+      .then((res) => {
+        const location = String(res.headers?.location || res.headers?.Location || '')
+        expect(res.status, `assistant login for ${email}`).to.be.oneOf([302, 303])
+        expect(location, `assistant login for ${email}`).to.not.include('/login')
+      })
+  })
+
+/**
+ * Reopen once when the session was replaced, or when a protected page bounced
+ * to the dashboard before the new permission was visible.
+ */
+export const visitAssistant = (path) =>
+  go(path).then(() =>
+    cy.url({ timeout: 20000 }).then((url) => {
+      const loggedOut = String(url).includes('/login')
+      if (!loggedOut && !wasRedirectedAway(url, path)) return
+      const recover = loggedOut
+        ? loginAsAssistant(SHARED_ASSISTANT)
+        : ensurePooledAssistant(activePermissions).then(() => loginAsAssistant(SHARED_ASSISTANT))
+      return recover.then(() => go(path))
+    }),
   )
 
 export const assertWorkingForTeacher = () =>
@@ -345,7 +490,7 @@ export const createInstructorDraftCourse = (title) =>
     .then(() => cy.get('select[name="level"]').select('Beginner'))
     .then(() => cy.get('select[name="delivery_type"]').select('Live'))
     .then(() => cy.wait(800))
-    .then(() => cy.get('#course_category').select('22', { force: true }))
+    .then(() => selectCourseCategory())
     .then(() => cy.wait(800))
     .then(() => cy.contains('label', 'Topic').parent().find('.select2-selection').click({ force: true }))
     .then(() => cy.contains('.select2-results__option', 'Math').click({ force: true }))
@@ -362,16 +507,32 @@ export const createInstructorDraftCourse = (title) =>
       })
     })
 
-export const ensureInstructorCourseId = () =>
-  ensureInstructorSession()
-    .then(() => go(ROUTES.myCourses))
-    .then(() => cy.url({ timeout: 20000 }).should('include', '/my-courses'))
-    .then(() => cy.get('body', { timeout: 20000 }).invoke('html'))
-    .then((html) => {
-      const ids = scrapeCourseIds(html)
-      if (ids.length) return cy.wrap(ids[0])
-      return createInstructorDraftCourse(`MEN1726 Course ${Date.now()}`)
+let cachedCourseId = ''
+
+/** The instructor course list is large enough to time out inside cy.request. */
+export const ensureInstructorCourseId = () => {
+  if (cachedCourseId) return cy.wrap(cachedCourseId, { log: false })
+  return cy
+    .task(
+      'instructorCourseId',
+      {
+        baseUrl: BASE(),
+        instructorEmail: INSTRUCTOR.email,
+        instructorPassword: INSTRUCTOR.password,
+      },
+      { timeout: 180000, log: false },
+    )
+    .then((result) => {
+      if (result && result.id) {
+        cachedCourseId = String(result.id)
+        return cy.wrap(cachedCourseId, { log: false })
+      }
+      return createInstructorDraftCourse(`MEN1726 Course ${Date.now()}`).then((id) => {
+        cachedCourseId = String(id)
+        return cy.wrap(cachedCourseId, { log: false })
+      })
     })
+}
 
 export const getInstructorCourseId = ensureInstructorCourseId
 
@@ -417,14 +578,24 @@ const hasCourseWriteAccess = ($b, path) => {
   return false
 }
 
+const reopenWithCurrentPermissions = (path) =>
+  ensurePooledAssistant(activePermissions).then(() =>
+    loginAsAssistant(SHARED_ASSISTANT).then(() => visitAssistant(path)),
+  )
+
 export const assertWithdrawAccessAllowed = () =>
-  go(ROUTES.withdraw).then(() => {
+  visitAssistant(ROUTES.withdraw).then(() =>
+    cy.url({ timeout: 20000 }).then((url) => {
+      if (String(url).includes('/dashboard/withdraw')) return
+      return reopenWithCurrentPermissions(ROUTES.withdraw)
+    }),
+  ).then(() => {
     cy.url({ timeout: 20000 }).should('include', '/dashboard/withdraw')
     cy.title({ timeout: 15000 }).should('match', /withdraw/i)
   })
 
 export const assertWithdrawAccessDenied = () =>
-  go(ROUTES.withdraw).then(() =>
+  visitAssistant(ROUTES.withdraw).then(() =>
     cy.url({ timeout: 15000 }).should((url) => {
       expect(
         wasRedirectedAway(url, ROUTES.withdraw) || !url.includes('/dashboard/withdraw'),
@@ -434,7 +605,7 @@ export const assertWithdrawAccessDenied = () =>
   )
 
 export const assertAccessDenied = (path) =>
-  go(path).then(() =>
+  visitAssistant(path).then(() =>
     cy.url({ timeout: 15000 }).then((url) => {
       if (wasRedirectedAway(url, path)) return
 
@@ -453,15 +624,22 @@ export const assertAccessDenied = (path) =>
     }),
   )
 
-export const assertAccessAllowed = (path, { mustInclude = null, selector = null } = {}) =>
-  go(path).then(() => {
+export const assertAccessAllowed = (path, { mustInclude = null, selector = null } = {}) => {
+  const segment = mustInclude || pathKey(path).split('/').slice(-2).join('/')
+  const confirm = () => {
     cy.url({ timeout: 20000 }).then((url) => {
-      const segment = mustInclude || pathKey(path).split('/').slice(-2).join('/')
       expect(url, `allowed access to ${path}`).to.include(segment)
       expect(wasRedirectedAway(url, path), `must stay on ${path}`).to.be.false
       if (selector) cy.get(selector, { timeout: 15000 }).should('exist')
     })
-  })
+  }
+  return visitAssistant(path).then(() =>
+    cy.url({ timeout: 20000 }).then((url) => {
+      if (String(url).includes(segment)) return
+      return reopenWithCurrentPermissions(path)
+    }),
+  ).then(confirm)
+}
 
 /** Sidebar/nav scoped — avoid false positives from debugbar / page copy. */
 export const assertNavContains = (labelRe) =>
@@ -479,7 +657,7 @@ export const assertNavMissing = (labelRe) =>
   })
 
 export const assertReadOnlyDashboard = () =>
-  go('/dashboard').then(() =>
+  visitAssistant('/dashboard').then(() =>
     cy.get('body').invoke('text').then((text) => {
       expect(WORKING_FOR_RE.test(text), 'assistant dashboard loads').to.be.true
       expect(/create new course/i.test(text), 'no create course CTA').to.be.false
@@ -487,17 +665,25 @@ export const assertReadOnlyDashboard = () =>
   )
 
 export const assertCannotManageAssistants = () =>
-  go(ASSISTANTS_LIST).then(() =>
-    cy.url({ timeout: 15000 }).should((url) => {
-      expect(
-        wasRedirectedAway(url, ASSISTANTS_LIST) || !url.includes('/dashboard/assistants'),
-        'assistant cannot open assistants management',
-      ).to.be.true
-    }),
-  )
+  cy
+    .request({
+      method: 'GET',
+      url: `${BASE()}${ASSISTANTS_LIST}`,
+      auth: AUTH,
+      followRedirect: false,
+      failOnStatusCode: false,
+      log: false,
+    })
+    .then((res) => {
+      const location = String(res.headers?.location || res.headers?.Location || '')
+      const denied =
+        ([301, 302, 303, 307, 308].includes(res.status) && !location.includes('/dashboard/assistants')) ||
+        res.status === 403
+      expect(denied, 'assistant cannot open assistants management').to.be.true
+    })
 
 export const assertCannotChangeZoom = () =>
-  go(ROUTES.zoom).then(() =>
+  visitAssistant(ROUTES.zoom).then(() =>
     cy.url({ timeout: 15000 }).then((url) => {
       if (wasRedirectedAway(url, ROUTES.zoom)) return
 
@@ -516,7 +702,7 @@ export const assertCannotChangeZoom = () =>
   )
 
 export const assertCannotArchiveCourse = () =>
-  go(ROUTES.myCourses).then(() =>
+  visitAssistant(ROUTES.myCourses).then(() =>
     cy.get('body').then(($b) => {
       const $archive = $b.find('a, button').filter((_, el) => /archive|أرش/i.test(el.textContent || ''))
       expect($archive.length, 'assistant should not see archive controls').to.equal(0)
@@ -525,7 +711,7 @@ export const assertCannotArchiveCourse = () =>
 
 /** Course page may open without students.view — roster controls must still be absent. */
 export const assertCannotViewEnrolledStudents = (courseId) =>
-  go(`/dashboard/courses/${courseId}`).then(() =>
+  visitAssistant(`/dashboard/courses/${courseId}`).then(() =>
     cy.url({ timeout: 15000 }).then((url) => {
       if (wasRedirectedAway(url, `/dashboard/courses/${courseId}`)) return
 

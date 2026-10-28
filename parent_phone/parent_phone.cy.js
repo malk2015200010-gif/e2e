@@ -16,20 +16,32 @@
  *   Input: #parent_phone_number (required, maxlength 15, placeholder 123456789)
  */
 
-import { visitWithAuth, loginViaApi } from '../../support/navigation.js'
-import { HTTP_AUTH, INSTRUCTOR, STUDENT } from '../../support/users.js'
+import { getAppBase, visitWithAuth, loginAndVisit } from '../../support/navigation.js'
+import { typeConfirmPassword } from '../regestration/password_policy_support.js'
+import { basicAuth, INSTRUCTOR, STUDENT, STUDENTS } from '../../support/users.js'
 
-const BASE = 'https://dev.mentoraeg.com'
-const AUTH = HTTP_AUTH
+const BASE = () => getAppBase()
 const PWD = 'Test@1234'
 
 const STUDENT_PHONE = '1012345678'
 const PARENT_PHONE = '1098765432'
 
+/** Prefer primary student; fall back to demo student if primary cannot open settings. */
+const SETTINGS_STUDENT =
+  STUDENTS.find((s) => s.email === 'student2@demo.com') || STUDENT
+
+
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
+/** Plain auth object at call time — avoids empty getters when env is late-loaded. */
 const go = (path, opts = {}) =>
-  cy.visit(`${BASE}${path}`, { auth: AUTH, failOnStatusCode: false, ...opts })
+  cy.visit(`${BASE()}${path}`, {
+    auth: basicAuth(),
+    failOnStatusCode: false,
+    timeout: 120000,
+    retryOnNetworkFailure: true,
+    ...opts,
+  })
 
 const switchToEnglish = () => go('/locale/en')
 const switchToArabic = () => go('/locale/ar')
@@ -51,20 +63,38 @@ const openRegister = ({ locale = null } = {}) => {
   resetSession()
   applyLocale(locale)
   visitWithAuth('register')
+  cy.url({ timeout: 20000 }).should('include', '/register')
   cy.get('body', { timeout: 15000 }).should('exist')
   cy.get('#registerForm, form[action*="register"]', { timeout: 15000 }).should('exist')
-  cy.get('#parent_phone_code, #phone_code', { timeout: 15000 }).should('exist')
-  parentPhoneInput().should('exist')
+  // Ensure student role so #parentPhoneGroup is visible (hidden for instructor).
+  cy.get('body').then(($body) => {
+    if ($body.find('input[name="user_as"][value="student"]').length) {
+      cy.get('input[name="user_as"][value="student"]').check({ force: true })
+    }
+  })
+  cy.get('#parentPhoneGroup', { timeout: 15000 }).should('be.visible')
+  cy.get('#parent_phone_code', { timeout: 15000 }).should('exist')
+  parentPhoneInput().should('be.visible')
   if (locale === 'ar') cy.get('html').should('have.attr', 'lang', 'ar')
 }
 
 const openStudentSettings = () => {
+  // Re-visit with auth (don't rely on cy.reload — it can drop Basic Auth / session).
   go('/dashboard/settings')
-  cy.url({ timeout: 20000 }).should('include', '/settings')
-  cy.url().should('not.include', '/login')
+  cy.url({ timeout: 20000 }).then((url) => {
+    if (url.includes('/login')) {
+      throw new Error(
+        'Opened /dashboard/settings but landed on /login — session was not established. ' +
+          `Tried student: ${SETTINGS_STUDENT.email}`,
+      )
+    }
+    expect(url).to.include('/settings')
+  })
   cy.get('body', { timeout: 15000 }).should('exist')
   openProfileTabIfNeeded()
 }
+
+const loginStudentSession = () => loginAndVisit(SETTINGS_STUDENT, '/dashboard')
 
 const openProfileTabIfNeeded = () => {
   cy.get('body', { timeout: 15000 }).then(($body) => {
@@ -86,14 +116,16 @@ const ensureParentPhoneFieldOnSettings = function () {
   cy.get('body', { timeout: 15000 }).then(function ($body) {
     const hasField = $body.find(PARENT_PHONE_INPUT_SEL).length > 0
     if (!hasField) {
-      cy.log('SKIP: parent phone field not on student settings — feature may not be deployed')
+      cy.log(
+        'SKIP: #parent_phone_number not on /dashboard/settings — platform has not deployed parent phone on profile yet',
+      )
       this.skip()
     }
   })
 }
 
 const openInstructorSettings = () => {
-  loginViaApi(INSTRUCTOR)
+  loginAndVisit(INSTRUCTOR, '/dashboard')
   go('/dashboard/settings')
 }
 
@@ -151,7 +183,14 @@ const assertParentPhoneInputAttrs = () => {
 const studentPhoneCodeSelect = () => cy.get('#phone_code', { timeout: 10000 })
 const studentPhoneInput = () => cy.get('#phone_number', { timeout: 10000 })
 const parentPhoneCodeSelect = () => cy.get('#parent_phone_code', { timeout: 10000 })
-const parentPhoneInput = () => cy.get(PARENT_PHONE_INPUT_SEL, { timeout: 15000 }).first()
+/** Visible parent-phone input (register or settings). */
+const parentPhoneInput = () =>
+  cy
+    .get(PARENT_PHONE_INPUT_SEL, { timeout: 15000 })
+    .should('have.length.at.least', 1)
+    .filter(':visible')
+    .first()
+    .should('exist')
 
 const selectIfPresent = (selector, value) => {
   cy.get('body').then(($body) => {
@@ -225,8 +264,8 @@ const fillRegisterForm = ({
   selectUserAs(userAs)
   fillStudentPhone(studentPhone)
   if (!skipParent) fillParentPhone(parentPhone, { countryCode: parentPhoneCountryCode })
-  cy.get('input[name="password"]').first().clear().type(password)
-  cy.get('input[name="password_confirmation"], input[id="password-confirm"]').first().clear().type(password)
+  cy.get('input[name="password"]').filter(':visible').first().clear({ force: true }).type(password, { force: true, delay: 15 })
+  typeConfirmPassword(password)
   return cy.wrap({ email, password, studentPhone, parentPhone })
 }
 
@@ -267,8 +306,30 @@ const expectRegisterPostIncludesParentPhone = (digits) => {
 
 const assertParentPhonePersisted = (digits) => {
   const expected = String(digits).replace(/\D/g, '')
-  parentPhoneInput().invoke('val').then((val) => {
-    expect(String(val || '').replace(/\D/g, '')).to.include(expected.slice(-Math.min(8, expected.length)))
+  const tail = expected.slice(-Math.min(8, expected.length))
+  const digitsOf = (value) => String(value || '').replace(/\D/g, '')
+
+  parentPhoneInput().then(($el) => {
+    // A rejected save redisplays on this same URL (value="INVALID", is-invalid).
+    // Stripping that text leaves no digits, so read the stored number instead.
+    if (!$el.hasClass('is-invalid')) {
+      expect(digitsOf($el.val()), 'stored parent phone').to.include(tail)
+      return
+    }
+    cy.request({
+      method: 'GET',
+      url: `${BASE()}/dashboard/settings`,
+      auth: basicAuth(),
+      failOnStatusCode: false,
+      log: false,
+      timeout: 120000,
+    }).then((res) => {
+      const html = typeof res.body === 'string' ? res.body : ''
+      expect(res.status, 'settings page').to.eq(200)
+      const tag = (html.match(/<input\b[^>]*name="parent_phone_number"[^>]*>/i) || [])[0] || ''
+      const value = (tag.match(/value="([^"]*)"/) || [])[1] || ''
+      expect(digitsOf(value), 'stored parent phone').to.include(tail)
+    })
   })
 }
 
@@ -302,6 +363,11 @@ const registerStudent = (opts = {}) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('AC — Registration (email)', () => {
+  before(() => {
+    // Fail fast with a clear message instead of soft-passing into missing DOM.
+    basicAuth()
+  })
+
   beforeEach(() => openRegister())
 
   it('PP-REG-01 | Parent phone field shown on email registration form', () => {
@@ -483,23 +549,25 @@ describe('AC — Student profile settings', { testIsolation: false }, () => {
   let savedParent = '1095544332'
 
   before(function () {
-    loginViaApi(STUDENT)
+    loginStudentSession()
     openStudentSettings()
-    cy.get('body', { timeout: 15000 })
-      .then(function ($body) {
-        const hasField = $body.find(PARENT_PHONE_INPUT_SEL).length > 0
-        if (!hasField) {
-          cy.log('SKIP: parent phone field not on student settings — skipping profile settings suite')
-          this.skip()
-        }
-      })
-      .then(function () {
-        seedSettingsParentPhone(savedParent)
-      })
+    // IMPORTANT: seed must stay inside this same then().
+    // A chained .then(seed) still runs after this.skip() and fails hard.
+    cy.get('body', { timeout: 15000 }).then(function ($body) {
+      const hasField = $body.find(PARENT_PHONE_INPUT_SEL).length > 0
+      if (!hasField) {
+        cy.log(
+          'SKIP: parent phone not on student settings — platform gap (register has the field, profile does not)',
+        )
+        this.skip()
+        return
+      }
+      seedSettingsParentPhone(savedParent)
+    })
   })
 
   beforeEach(function () {
-    loginViaApi(STUDENT)
+    loginStudentSession()
     ensureParentPhoneFieldOnSettings.call(this)
   })
 
@@ -539,7 +607,6 @@ describe('AC — Student profile settings', { testIsolation: false }, () => {
     const updated = '1096677889'
     fillParentPhone(updated)
     submitSettings()
-    cy.reload()
     openStudentSettings()
     assertParentPhonePersisted(updated)
     savedParent = updated
@@ -556,7 +623,6 @@ describe('AC — Student profile settings', { testIsolation: false }, () => {
     const next = '1096655443'
     fillParentPhone(next)
     submitSettings()
-    cy.reload()
     openStudentSettings()
     assertParentPhonePersisted(next)
   })
@@ -588,7 +654,7 @@ describe('AC — Instructor profile (out of scope)', () => {
 
 describe('AC — Data persistence', () => {
   beforeEach(function () {
-    loginViaApi(STUDENT)
+    loginStudentSession()
     ensureParentPhoneFieldOnSettings.call(this)
   })
 
@@ -596,7 +662,6 @@ describe('AC — Data persistence', () => {
     const parent = '1091234500'
     fillParentPhone(parent)
     submitSettings()
-    cy.reload()
     openStudentSettings()
     assertParentPhonePersisted(parent)
   })
@@ -604,7 +669,6 @@ describe('AC — Data persistence', () => {
   it('PP-DATA-02 | Profile update replaces parent_phone', () => {
     fillParentPhone('1091234501')
     submitSettings()
-    cy.reload()
     openStudentSettings()
     assertParentPhonePersisted('1091234501')
   })
@@ -613,12 +677,10 @@ describe('AC — Data persistence', () => {
     const good = '1091234502'
     fillParentPhone(good)
     submitSettings()
-    cy.reload()
     openStudentSettings()
     fillParentPhone('INVALID', { raw: true })
     submitSettings()
     expectSettingsFormValidation(/invalid/i)
-    cy.reload()
     openStudentSettings()
     assertParentPhonePersisted(good)
   })

@@ -30,7 +30,9 @@ it('Positive - instructor info visible', () => {
 // sessions — not on every course. The catalog's first card is whatever
 // course happens to sort first (often a "Recorded" one), so these tests
 // target a known live-sessions course directly instead of "the first card".
-const LIVE_SESSIONS_COURSE_SLUG = 'live-course-1'
+// Verified on dig 2026-09-10: live-course-1 has no schedule widget;
+// test-zoom-delete-sessions still exposes .live-schedule-toggle.
+const LIVE_SESSIONS_COURSE_SLUG = 'test-zoom-delete-sessions'
 
 it('Positive - course schedule visible', () => {
 
